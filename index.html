@@ -353,109 +353,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);display:flex;jus
 </head>
 <body>
 
-<!-- ══ PWA 온보딩 화면 ══ -->
-<div id="onboarding-overlay" style="display:none;position:fixed;inset:0;background:#fff;z-index:99999;overflow-y:auto;">
-  
-  <!-- 닫기 버튼 -->
-  <button onclick="closeOnboarding()" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;color:#999;cursor:pointer;z-index:1;">✕</button>
-
-  <!-- 스텝 1: 홈화면 추가 -->
-  <div id="ob-step-install" style="padding:40px 28px 100px;min-height:100vh;box-sizing:border-box;max-width:430px;margin:0 auto;">
-    <div style="font-size:28px;font-weight:900;color:#191F28;line-height:1.3;margin-bottom:12px;">
-      앱 홈화면에<br>추가하기
-    </div>
-    <div style="font-size:15px;color:#666;line-height:1.7;margin-bottom:36px;">
-      남한강마트 퇴계원점 앱을<br>
-      홈화면에 추가하면 앱처럼<br>
-      빠르게 이용할 수 있어요.
-    </div>
-
-    <!-- 폰 목업 -->
-    <div style="position:relative;margin:0 auto 32px;width:220px;">
-      <div style="background:#f0f0f0;border-radius:28px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.12);">
-        <!-- 상태바 -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:0 4px;">
-          <div style="font-size:11px;font-weight:700;color:#333;">9:41</div>
-          <div style="font-size:11px;color:#333;">●●● 🔋</div>
-        </div>
-        <!-- 앱 화면 -->
-        <div style="background:#FFD600;border-radius:16px;padding:16px;text-align:center;">
-          <div style="font-size:32px;margin-bottom:6px;">🛒</div>
-          <div style="font-size:13px;font-weight:800;color:#191F28;">남한강마트</div>
-          <div style="font-size:10px;color:#191F28;opacity:0.7;">퇴계원점</div>
-        </div>
-        <!-- 하단 툴팁 -->
-        <div style="background:#fff;border-radius:12px;padding:12px;margin-top:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-          <div style="font-size:12px;font-weight:700;color:#191F28;margin-bottom:4px;">📲 홈화면에 추가란?</div>
-          <div style="font-size:11px;color:#666;line-height:1.5;">앱 아이콘을 홈화면에 저장해<br>언제든 바로 실행할 수 있어요.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- iOS 안내 -->
-    <div id="ob-ios-guide" style="display:none;background:#F0F7FF;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #C0D8F5;">
-      <div style="font-size:13px;font-weight:700;color:#185FA5;margin-bottom:8px;">iPhone · iPad 홈화면 추가 방법</div>
-      <div style="font-size:12px;color:#333;line-height:2;">
-        1️⃣ 하단 <b style="color:#185FA5;">공유 버튼(□↑)</b> 탭<br>
-        2️⃣ <b style="color:#185FA5;">'홈 화면에 추가'</b> 선택<br>
-        3️⃣ 우측 상단 <b style="color:#185FA5;">'추가'</b> 탭
-      </div>
-    </div>
-
-  </div>
-
-  <!-- 스텝 2: 알림 허용 -->
-  <div id="ob-step-notif" style="display:none;padding:40px 28px 100px;min-height:100vh;box-sizing:border-box;max-width:430px;margin:0 auto;">
-    <div style="font-size:28px;font-weight:900;color:#191F28;line-height:1.3;margin-bottom:12px;">
-      앱 푸시 알림<br>수신
-    </div>
-    <div style="font-size:15px;color:#666;line-height:1.7;margin-bottom:36px;">
-      남한강마트가 제공하는<br>
-      타임세일, 특가, 이벤트 등의<br>
-      혜택을 받아보기 위해<br>
-      <span style="color:#185FA5;font-weight:700;">앱 푸시 알림 수신을 설정</span>합니다.
-    </div>
-
-    <!-- 폰 목업 -->
-    <div style="position:relative;margin:0 auto 32px;width:220px;">
-      <div style="background:#f0f0f0;border-radius:28px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.12);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:0 4px;">
-          <div style="font-size:11px;font-weight:700;color:#333;">9:41</div>
-          <div style="font-size:11px;color:#333;">●●● 🔋</div>
-        </div>
-        <div style="background:#fff;border-radius:12px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <div style="width:28px;height:28px;background:#FFD600;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;">🛒</div>
-            <div style="font-size:12px;font-weight:700;color:#191F28;">남한강마트 · 방금</div>
-          </div>
-          <div style="font-size:12px;font-weight:700;color:#191F28;margin-bottom:2px;">⚡ 타임세일 시작!</div>
-          <div style="font-size:11px;color:#666;">한돈 삼겹살 500g → 5,300원 (40%↓)</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 알림 이유 안내 -->
-    <div style="background:#FFF8E8;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #FFE8A0;">
-      <div style="font-size:13px;font-weight:700;color:#8B6500;margin-bottom:8px;">🔔 이런 알림을 보내드려요</div>
-      <div style="font-size:12px;color:#333;line-height:2.2;">
-        ⚡ 타임세일 · 특가 상품 안내<br>
-        📢 매장 공지 · 운영시간 변경<br>
-        🎟️ 쿠폰 · 이벤트 안내
-      </div>
-    </div>
-  </div>
-
-  <!-- 하단 고정 버튼 -->
-  <div style="position:sticky;bottom:0;width:100%;padding:16px 20px;background:#fff;box-shadow:0 -2px 12px rgba(0,0,0,0.08);box-sizing:border-box;">
-    <button id="ob-main-btn" onclick="onboardingNext()" style="width:100%;background:#185FA5;color:#fff;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">확인</button>
-    <div id="ob-skip-wrap" style="text-align:center;margin-top:10px;">
-      <button onclick="closeOnboarding()" style="background:none;border:none;color:#aaa;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">건너뛰기</button>
-    </div>
-  </div>
-
-</div>
-
-
 <div class="wrap">
 
     <div style="flex:1;">
@@ -1769,7 +1666,33 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);display:flex;jus
 <script>
 // ── PWA 온보딩 ──
 let deferredPrompt = null;
-let obStep = 1; // 1: 홈화면추가, 2: 알림허용
+let obStep = 1;
+
+function requestNotifPermission(){
+  if('Notification' in window && Notification.permission === 'default'){
+    Notification.requestPermission().then(() => closeOnboarding());
+  } else {
+    closeOnboarding();
+  }
+}
+
+function installPWA(){
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
+  }
+  obStep = 2;
+  renderObStep();
+}
+
+function dismissInstall(){
+  obStep = 2;
+  renderObStep();
+}
+
+function dismissNotif(){
+  closeOnboarding();
+}
 
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
@@ -4582,5 +4505,107 @@ function clearProdSearch(){
 
 </script>
 </div>
+<!-- ══ PWA 온보딩 화면 ══ -->
+<div id="onboarding-overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:99999;overflow-y:auto;">
+  
+  <!-- 닫기 버튼 -->
+  <button onclick="closeOnboarding()" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;color:#999;cursor:pointer;z-index:1;">✕</button>
+
+  <!-- 스텝 1: 홈화면 추가 -->
+  <div id="ob-step-install" style="padding:40px 28px 100px;min-height:100vh;box-sizing:border-box;">
+    <div style="font-size:28px;font-weight:900;color:#191F28;line-height:1.3;margin-bottom:12px;">
+      앱 홈화면에<br>추가하기
+    </div>
+    <div style="font-size:15px;color:#666;line-height:1.7;margin-bottom:36px;">
+      남한강마트 퇴계원점 앱을<br>
+      홈화면에 추가하면 앱처럼<br>
+      빠르게 이용할 수 있어요.
+    </div>
+
+    <!-- 폰 목업 -->
+    <div style="position:relative;margin:0 auto 32px;width:220px;">
+      <div style="background:#f0f0f0;border-radius:28px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.12);">
+        <!-- 상태바 -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:0 4px;">
+          <div style="font-size:11px;font-weight:700;color:#333;">9:41</div>
+          <div style="font-size:11px;color:#333;">●●● 🔋</div>
+        </div>
+        <!-- 앱 화면 -->
+        <div style="background:#FFD600;border-radius:16px;padding:16px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:6px;">🛒</div>
+          <div style="font-size:13px;font-weight:800;color:#191F28;">남한강마트</div>
+          <div style="font-size:10px;color:#191F28;opacity:0.7;">퇴계원점</div>
+        </div>
+        <!-- 하단 툴팁 -->
+        <div style="background:#fff;border-radius:12px;padding:12px;margin-top:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+          <div style="font-size:12px;font-weight:700;color:#191F28;margin-bottom:4px;">📲 홈화면에 추가란?</div>
+          <div style="font-size:11px;color:#666;line-height:1.5;">앱 아이콘을 홈화면에 저장해<br>언제든 바로 실행할 수 있어요.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- iOS 안내 -->
+    <div id="ob-ios-guide" style="display:none;background:#F0F7FF;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #C0D8F5;">
+      <div style="font-size:13px;font-weight:700;color:#185FA5;margin-bottom:8px;">iPhone · iPad 홈화면 추가 방법</div>
+      <div style="font-size:12px;color:#333;line-height:2;">
+        1️⃣ 하단 <b style="color:#185FA5;">공유 버튼(□↑)</b> 탭<br>
+        2️⃣ <b style="color:#185FA5;">'홈 화면에 추가'</b> 선택<br>
+        3️⃣ 우측 상단 <b style="color:#185FA5;">'추가'</b> 탭
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 스텝 2: 알림 허용 -->
+  <div id="ob-step-notif" style="display:none;padding:40px 28px 100px;min-height:100vh;box-sizing:border-box;">
+    <div style="font-size:28px;font-weight:900;color:#191F28;line-height:1.3;margin-bottom:12px;">
+      앱 푸시 알림<br>수신
+    </div>
+    <div style="font-size:15px;color:#666;line-height:1.7;margin-bottom:36px;">
+      남한강마트가 제공하는<br>
+      타임세일, 특가, 이벤트 등의<br>
+      혜택을 받아보기 위해<br>
+      <span style="color:#185FA5;font-weight:700;">앱 푸시 알림 수신을 설정</span>합니다.
+    </div>
+
+    <!-- 폰 목업 -->
+    <div style="position:relative;margin:0 auto 32px;width:220px;">
+      <div style="background:#f0f0f0;border-radius:28px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.12);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:0 4px;">
+          <div style="font-size:11px;font-weight:700;color:#333;">9:41</div>
+          <div style="font-size:11px;color:#333;">●●● 🔋</div>
+        </div>
+        <div style="background:#fff;border-radius:12px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div style="width:28px;height:28px;background:#FFD600;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;">🛒</div>
+            <div style="font-size:12px;font-weight:700;color:#191F28;">남한강마트 · 방금</div>
+          </div>
+          <div style="font-size:12px;font-weight:700;color:#191F28;margin-bottom:2px;">⚡ 타임세일 시작!</div>
+          <div style="font-size:11px;color:#666;">한돈 삼겹살 500g → 5,300원 (40%↓)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 알림 이유 안내 -->
+    <div style="background:#FFF8E8;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #FFE8A0;">
+      <div style="font-size:13px;font-weight:700;color:#8B6500;margin-bottom:8px;">🔔 이런 알림을 보내드려요</div>
+      <div style="font-size:12px;color:#333;line-height:2.2;">
+        ⚡ 타임세일 · 특가 상품 안내<br>
+        📢 매장 공지 · 운영시간 변경<br>
+        🎟️ 쿠폰 · 이벤트 안내
+      </div>
+    </div>
+  </div>
+
+  <!-- 하단 고정 버튼 -->
+  <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;padding:16px 20px;background:#fff;box-shadow:0 -2px 12px rgba(0,0,0,0.08);box-sizing:border-box;z-index:1;">
+    <button id="ob-main-btn" onclick="onboardingNext()" style="width:100%;background:#185FA5;color:#fff;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">확인</button>
+    <div id="ob-skip-wrap" style="text-align:center;margin-top:10px;">
+      <button onclick="closeOnboarding()" style="background:none;border:none;color:#aaa;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">건너뛰기</button>
+    </div>
+  </div>
+
+</div>
+
 </body>
 </html>
