@@ -353,6 +353,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);display:flex;jus
 </head>
 <body>
 
+
 <div class="wrap">
 
     <div style="flex:1;">
@@ -1664,114 +1665,29 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);display:flex;jus
 </div>
 
 <script>
-// ── PWA 온보딩 ──
-let deferredPrompt = null;
-let obStep = 1;
-
-function requestNotifPermission(){
-  if('Notification' in window && Notification.permission === 'default'){
-    Notification.requestPermission().then(() => closeOnboarding());
-  } else {
-    closeOnboarding();
-  }
-}
-
-function installPWA(){
-  if(deferredPrompt){
-    deferredPrompt.prompt();
-    deferredPrompt.userChoice.then(() => { deferredPrompt = null; });
-  }
-  obStep = 2;
-  renderObStep();
-}
-
-function dismissInstall(){
-  obStep = 2;
-  renderObStep();
-}
-
-function dismissNotif(){
-  closeOnboarding();
-}
-
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  deferredPrompt = e;
-});
+var _deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); _deferredPrompt=e; });
 
 function showOnboarding(){
-  const overlay = document.getElementById('onboarding-overlay');
-  if(!overlay) return;
-  // 이미 본 경우 스킵
-  // if(localStorage.getItem('ob_done')) return; // 배포 후 이 줄 활성화
-  obStep = 1;
-  overlay.style.display = 'block';
-  renderObStep();
+  try{ if(localStorage.getItem('ob_done')) return; }catch(e){}
+  var el=document.getElementById('ob-popup'); if(!el) return;
+  el.style.display='flex';
+  var iOS=/iphone|ipad|ipod/i.test(navigator.userAgent), sa=window.navigator.standalone===true;
+  if(iOS&&!sa){ var g=document.getElementById('ob-ios-guide'); if(g)g.style.display='block'; var b=document.getElementById('ob-add-btn'); if(b)b.style.display='none'; }
+  else if(!_deferredPrompt){ var b2=document.getElementById('ob-add-btn'); if(b2)b2.textContent='다음'; }
 }
+function obInstall(){ if(_deferredPrompt){_deferredPrompt.prompt();_deferredPrompt.userChoice.then(function(){_deferredPrompt=null;});} obStep2(); }
+function obStep2(){ var s1=document.getElementById('ob-s1'),s2=document.getElementById('ob-s2'); if(s1)s1.style.display='none'; if(s2)s2.style.display='block'; }
+function obAllow(){ if('Notification'in window&&Notification.permission==='default'){Notification.requestPermission().then(function(){closeOnboarding();});}else{closeOnboarding();} }
+function closeOnboarding(){ var el=document.getElementById('ob-popup'); if(el)el.style.display='none'; try{localStorage.setItem('ob_done','1');}catch(e){} }
+function requestNotifPermission(){obAllow();}
+function installPWA(){obInstall();}
+function dismissInstall(){obStep2();}
+function dismissNotif(){closeOnboarding();}
+function onboardingNext(){obStep2();}
 
-function renderObStep(){
-  const step1 = document.getElementById('ob-step-install');
-  const step2 = document.getElementById('ob-step-notif');
-  const btn   = document.getElementById('ob-main-btn');
-  const skipWrap = document.getElementById('ob-skip-wrap');
-  const iosGuide = document.getElementById('ob-ios-guide');
 
-  if(obStep === 1){
-    step1.style.display = 'block';
-    step2.style.display = 'none';
-    btn.textContent = '확인';
-    btn.style.background = '#185FA5';
-    // iOS 여부
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isStandalone = window.navigator.standalone === true;
-    if(isIOS && !isStandalone){
-      iosGuide.style.display = 'block';
-      btn.textContent = '알겠어요!';
-    } else if(deferredPrompt){
-      btn.textContent = '홈화면에 추가하기';
-      btn.style.background = '#191F28';
-    } else {
-      btn.textContent = '다음';
-    }
-  } else {
-    step1.style.display = 'none';
-    step2.style.display = 'block';
-    btn.textContent = '알림 허용하기';
-    btn.style.background = '#185FA5';
-  }
-}
 
-function onboardingNext(){
-  if(obStep === 1){
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isStandalone = window.navigator.standalone === true;
-    if(deferredPrompt && !isIOS){
-      // Android/Chrome: 설치 프롬프트 표시
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; });
-    }
-    // 알림 허용 스텝으로
-    obStep = 2;
-    renderObStep();
-  } else {
-    // 알림 허용 요청
-    if('Notification' in window && Notification.permission === 'default'){
-      Notification.requestPermission().then(perm => {
-        closeOnboarding();
-      });
-    } else {
-      closeOnboarding();
-    }
-  }
-}
-
-function closeOnboarding(){
-  const overlay = document.getElementById('onboarding-overlay');
-  if(overlay) overlay.style.display = 'none';
-  try { localStorage.setItem('ob_done','1'); } catch(e){}
-}
-
-// 서비스워커 등록
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
@@ -4505,107 +4421,30 @@ function clearProdSearch(){
 
 </script>
 </div>
-<!-- ══ PWA 온보딩 화면 ══ -->
-<div id="onboarding-overlay" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:99999;overflow-y:auto;">
-  
-  <!-- 닫기 버튼 -->
-  <button onclick="closeOnboarding()" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;color:#999;cursor:pointer;z-index:1;">✕</button>
-
-  <!-- 스텝 1: 홈화면 추가 -->
-  <div id="ob-step-install" style="padding:40px 28px 100px;min-height:100vh;box-sizing:border-box;">
-    <div style="font-size:28px;font-weight:900;color:#191F28;line-height:1.3;margin-bottom:12px;">
-      앱 홈화면에<br>추가하기
-    </div>
-    <div style="font-size:15px;color:#666;line-height:1.7;margin-bottom:36px;">
-      남한강마트 퇴계원점 앱을<br>
-      홈화면에 추가하면 앱처럼<br>
-      빠르게 이용할 수 있어요.
-    </div>
-
-    <!-- 폰 목업 -->
-    <div style="position:relative;margin:0 auto 32px;width:220px;">
-      <div style="background:#f0f0f0;border-radius:28px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.12);">
-        <!-- 상태바 -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:0 4px;">
-          <div style="font-size:11px;font-weight:700;color:#333;">9:41</div>
-          <div style="font-size:11px;color:#333;">●●● 🔋</div>
-        </div>
-        <!-- 앱 화면 -->
-        <div style="background:#FFD600;border-radius:16px;padding:16px;text-align:center;">
-          <div style="font-size:32px;margin-bottom:6px;">🛒</div>
-          <div style="font-size:13px;font-weight:800;color:#191F28;">남한강마트</div>
-          <div style="font-size:10px;color:#191F28;opacity:0.7;">퇴계원점</div>
-        </div>
-        <!-- 하단 툴팁 -->
-        <div style="background:#fff;border-radius:12px;padding:12px;margin-top:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-          <div style="font-size:12px;font-weight:700;color:#191F28;margin-bottom:4px;">📲 홈화면에 추가란?</div>
-          <div style="font-size:11px;color:#666;line-height:1.5;">앱 아이콘을 홈화면에 저장해<br>언제든 바로 실행할 수 있어요.</div>
-        </div>
+<div id="ob-popup" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);z-index:99999;align-items:center;justify-content:center;box-sizing:border-box;padding:20px;">
+  <div style="background:#fff;border-radius:20px;padding:24px;width:100%;max-width:340px;position:relative;margin:auto;">
+    <button onclick="closeOnboarding()" style="position:absolute;top:10px;right:14px;background:none;border:none;font-size:22px;color:#ccc;cursor:pointer;">✕</button>
+    <div id="ob-s1">
+      <div style="font-size:34px;text-align:center;margin-bottom:10px;">📲</div>
+      <div style="font-size:17px;font-weight:800;text-align:center;margin-bottom:8px;">홈화면에 추가하기</div>
+      <div style="font-size:13px;color:#666;text-align:center;line-height:1.6;margin-bottom:16px;">남한강마트 앱을 홈화면에 추가하면<br>앱처럼 빠르게 이용할 수 있어요</div>
+      <div id="ob-ios-guide" style="display:none;background:#EEF6FF;border-radius:10px;padding:12px;margin-bottom:14px;font-size:12px;line-height:2.1;">
+        1️⃣ 하단 <b style="color:#185FA5;">공유(□↑)</b> 버튼 탭<br>
+        2️⃣ <b style="color:#185FA5;">홈 화면에 추가</b> 선택<br>
+        3️⃣ 우측 상단 <b style="color:#185FA5;">추가</b> 탭
       </div>
+      <button id="ob-add-btn" onclick="obInstall()" style="width:100%;background:#191F28;color:#FFD600;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">홈화면에 추가하기</button>
+      <button onclick="obStep2()" style="width:100%;background:#f0f0f0;color:#666;border:none;border-radius:12px;padding:12px;font-size:13px;cursor:pointer;">건너뛰기</button>
     </div>
-
-    <!-- iOS 안내 -->
-    <div id="ob-ios-guide" style="display:none;background:#F0F7FF;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #C0D8F5;">
-      <div style="font-size:13px;font-weight:700;color:#185FA5;margin-bottom:8px;">iPhone · iPad 홈화면 추가 방법</div>
-      <div style="font-size:12px;color:#333;line-height:2;">
-        1️⃣ 하단 <b style="color:#185FA5;">공유 버튼(□↑)</b> 탭<br>
-        2️⃣ <b style="color:#185FA5;">'홈 화면에 추가'</b> 선택<br>
-        3️⃣ 우측 상단 <b style="color:#185FA5;">'추가'</b> 탭
-      </div>
-    </div>
-
-  </div>
-
-  <!-- 스텝 2: 알림 허용 -->
-  <div id="ob-step-notif" style="display:none;padding:40px 28px 100px;min-height:100vh;box-sizing:border-box;">
-    <div style="font-size:28px;font-weight:900;color:#191F28;line-height:1.3;margin-bottom:12px;">
-      앱 푸시 알림<br>수신
-    </div>
-    <div style="font-size:15px;color:#666;line-height:1.7;margin-bottom:36px;">
-      남한강마트가 제공하는<br>
-      타임세일, 특가, 이벤트 등의<br>
-      혜택을 받아보기 위해<br>
-      <span style="color:#185FA5;font-weight:700;">앱 푸시 알림 수신을 설정</span>합니다.
-    </div>
-
-    <!-- 폰 목업 -->
-    <div style="position:relative;margin:0 auto 32px;width:220px;">
-      <div style="background:#f0f0f0;border-radius:28px;padding:14px;box-shadow:0 8px 32px rgba(0,0,0,0.12);">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:0 4px;">
-          <div style="font-size:11px;font-weight:700;color:#333;">9:41</div>
-          <div style="font-size:11px;color:#333;">●●● 🔋</div>
-        </div>
-        <div style="background:#fff;border-radius:12px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-            <div style="width:28px;height:28px;background:#FFD600;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;">🛒</div>
-            <div style="font-size:12px;font-weight:700;color:#191F28;">남한강마트 · 방금</div>
-          </div>
-          <div style="font-size:12px;font-weight:700;color:#191F28;margin-bottom:2px;">⚡ 타임세일 시작!</div>
-          <div style="font-size:11px;color:#666;">한돈 삼겹살 500g → 5,300원 (40%↓)</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 알림 이유 안내 -->
-    <div style="background:#FFF8E8;border-radius:16px;padding:16px;margin-bottom:16px;border:1px solid #FFE8A0;">
-      <div style="font-size:13px;font-weight:700;color:#8B6500;margin-bottom:8px;">🔔 이런 알림을 보내드려요</div>
-      <div style="font-size:12px;color:#333;line-height:2.2;">
-        ⚡ 타임세일 · 특가 상품 안내<br>
-        📢 매장 공지 · 운영시간 변경<br>
-        🎟️ 쿠폰 · 이벤트 안내
-      </div>
+    <div id="ob-s2" style="display:none;">
+      <div style="font-size:34px;text-align:center;margin-bottom:10px;">🔔</div>
+      <div style="font-size:17px;font-weight:800;text-align:center;margin-bottom:8px;">특가 알림 받기</div>
+      <div style="font-size:13px;color:#666;text-align:center;line-height:1.6;margin-bottom:16px;">타임세일·이벤트 소식을 바로 알려드려요</div>
+      <div style="background:#FFF8E8;border-radius:10px;padding:12px;margin-bottom:14px;font-size:12px;color:#555;line-height:2.2;">⚡ 타임세일 · 특가 안내<br>📢 매장 공지 안내<br>🎟️ 쿠폰 · 이벤트 안내</div>
+      <button onclick="obAllow()" style="width:100%;background:#FFD600;color:#191F28;border:none;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;">알림 허용하기</button>
+      <button onclick="closeOnboarding()" style="width:100%;background:#f0f0f0;color:#666;border:none;border-radius:12px;padding:12px;font-size:13px;cursor:pointer;">나중에</button>
     </div>
   </div>
-
-  <!-- 하단 고정 버튼 -->
-  <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;padding:16px 20px;background:#fff;box-shadow:0 -2px 12px rgba(0,0,0,0.08);box-sizing:border-box;z-index:1;">
-    <button id="ob-main-btn" onclick="onboardingNext()" style="width:100%;background:#185FA5;color:#fff;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">확인</button>
-    <div id="ob-skip-wrap" style="text-align:center;margin-top:10px;">
-      <button onclick="closeOnboarding()" style="background:none;border:none;color:#aaa;font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">건너뛰기</button>
-    </div>
-  </div>
-
 </div>
-
 </body>
 </html>
