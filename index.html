@@ -354,7 +354,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);display:flex;jus
 <body>
 
 <!-- ══ PWA 온보딩 화면 ══ -->
-<div id="onboarding-overlay" style="display:none;position:fixed;inset:0;background:#fff;z-index:9999;overflow-y:auto;max-width:430px;left:50%;transform:translateX(-50%);">
+<div id="onboarding-overlay" style="display:none;position:fixed;inset:0;background:#fff;z-index:99999;overflow-y:auto;width:100%;max-width:430px;left:50%;transform:translateX(-50%);box-shadow:0 0 0 100vw rgba(0,0,0,0.5);">
   
   <!-- 닫기 버튼 -->
   <button onclick="closeOnboarding()" style="position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;color:#999;cursor:pointer;z-index:1;">✕</button>
@@ -1780,7 +1780,7 @@ function showOnboarding(){
   const overlay = document.getElementById('onboarding-overlay');
   if(!overlay) return;
   // 이미 본 경우 스킵
-  if(localStorage.getItem('ob_done')) return;
+  // if(localStorage.getItem('ob_done')) return; // 배포 후 이 줄 활성화
   obStep = 1;
   overlay.style.display = 'block';
   renderObStep();
