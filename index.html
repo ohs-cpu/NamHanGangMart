@@ -1977,7 +1977,13 @@ async function collectAllTokens(){
 }
 
 async function sendPushViaWorker(title, body, image){
+  // FCM은 base64 이미지를 지원하지 않음 → http URL만 허용
+  let pushImage = null;
+  if(image && typeof image === 'string' && image.startsWith('http')){
+    pushImage = image;
+  }
   const tokens = await collectAllTokens();
+  console.log('수집된 토큰:', tokens.length, '개');
   if(!tokens.length){
     showToast('⚠️ 발송 대상이 없어요 (알림 허용한 손님 0명)');
     return { success:0, failure:0 };
@@ -1986,14 +1992,24 @@ async function sendPushViaWorker(title, body, image){
     const res = await fetch(PUSH_WORKER_URL, {
       method: 'POST',
       headers: { 'Content-Type':'application/json', 'X-Admin-Secret':PUSH_ADMIN_SECRET },
-      body: JSON.stringify({ tokens, title, body, image: image||null })
+      body: JSON.stringify({ tokens, title, body, image: pushImage })
     });
     const data = await res.json();
-    if(res.ok) return data;
-    showToast('⚠️ 발송 실패: '+(data.error||res.status));
+    console.log('Worker 응답:', JSON.stringify(data));
+    if(res.ok){
+      if(data.failure > 0 && data.success === 0){
+        // 발송은 됐으나 FCM이 거부
+        const reason = data.invalidTokens && data.invalidTokens.length ? '토큰만료/무효' : 'FCM거부';
+        showToast('⚠️ FCM 발송실패: '+reason);
+      }
+      return data;
+    }
+    showToast('⚠️ Worker 오류: '+(data.error||res.status));
+    console.error('Worker 에러:', data);
     return { success:0, failure:tokens.length };
   } catch(e){
     showToast('⚠️ 발송 오류: '+e.message);
+    console.error('발송 예외:', e);
     return { success:0, failure:tokens.length };
   }
 }
