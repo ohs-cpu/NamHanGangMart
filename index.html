@@ -1528,7 +1528,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
           </div>
         </div>
         <div id="push-title-emoji-picker" style="display:none;background:#fff;border:1px solid var(--gray5);border-radius:12px;padding:10px;margin-bottom:6px;">
-          <input type="text" placeholder="🔍 이모지 검색..." oninput="filterEmoji('push-title-emoji-picker','push-title-emoji')"
+          <input type="text" placeholder="🔍 이모지 검색..." oninput="filterEmojiPush('push-title-emoji-picker','push-title-emoji')"
             style="width:100%;border:1px solid var(--gray5);border-radius:8px;padding:6px 10px;font-size:12px;outline:none;box-sizing:border-box;margin-bottom:6px;"/>
           <div id="push-title-emoji-picker-grid" style="display:flex;flex-wrap:wrap;gap:4px;max-height:120px;overflow-y:auto;"></div>
         </div>
@@ -1545,7 +1545,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
           </div>
         </div>
         <div id="push-body-emoji-picker" style="display:none;background:#fff;border:1px solid var(--gray5);border-radius:12px;padding:10px;margin-bottom:6px;">
-          <input type="text" placeholder="🔍 이모지 검색..." oninput="filterEmoji('push-body-emoji-picker','push-body-emoji')"
+          <input type="text" placeholder="🔍 이모지 검색..." oninput="filterEmojiPush('push-body-emoji-picker','push-body-emoji')"
             style="width:100%;border:1px solid var(--gray5);border-radius:8px;padding:6px 10px;font-size:12px;outline:none;box-sizing:border-box;margin-bottom:6px;"/>
           <div id="push-body-emoji-picker-grid" style="display:flex;flex-wrap:wrap;gap:4px;max-height:120px;overflow-y:auto;"></div>
         </div>
@@ -4937,18 +4937,18 @@ let pushSelectedProducts = [];
 let pushProductCatFilter = '전체';
 
 // 이모지 팔레트 — 제목/내용 input에 삽입
-function filterEmoji(pickerId, targetId){
+function filterEmojiPush(pickerId, targetId){
   const kw = document.querySelector('#'+pickerId+' input')?.value||'';
   const grid = document.getElementById(pickerId+'-grid');
   if(!grid) return;
   if(!grid.dataset.init){
-    buildEmojiPicker(pickerId, targetId);
+    buildEmojiPickerPush(pickerId, targetId);
     grid.dataset.init='1';
   }
   renderEmojiGridForInput(pickerId, targetId, kw);
 }
 
-function buildEmojiPicker(pickerId, targetId){
+function buildEmojiPickerPush(pickerId, targetId){
   const grid = document.getElementById(pickerId+'-grid');
   if(!grid) return;
   renderEmojiGridForInput(pickerId, targetId, '');
@@ -5592,20 +5592,6 @@ function prodSearch(val){
 }
 function clearProdSearch(){
   const inp=document.getElementById('prod-search-input');
-  const clear=document.getElementById('prod-search-clear');
-  if(inp) inp.value=''; if(clear) clear.style.display='none';
-  renderProducts(currentCat);
-}
-
-</script>lear.style.display='none';
-  renderProducts(currentCat);
-}
-
-</script>) inp.value=''; if(clear) clear.style.display='none';
-  renderProducts(currentCat);
-}
-
-</script>tElementById('prod-search-input');
   const clear=document.getElementById('prod-search-clear');
   if(inp) inp.value=''; if(clear) clear.style.display='none';
   renderProducts(currentCat);
