@@ -1907,6 +1907,100 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
 </div>
 
 <script>
+// ── 온보딩 팝업 ──
+var _deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  _deferredPrompt = e;
+});
+
+function checkOnboarding(){
+  // 설치 여부 확인
+  var isInstalled = window.matchMedia('(display-mode: standalone)').matches
+                 || window.navigator.standalone === true;
+  // 알림 허용 여부
+  var notifGranted = ('Notification' in window) && Notification.permission === 'granted';
+
+  // 둘 다 완료면 팝업 안 띄움
+  if(isInstalled && notifGranted) return;
+
+  // 팝업 표시
+  showObPopup();
+}
+
+function showObPopup(){
+  var el = document.getElementById('ob-overlay');
+  if(!el) return;
+  el.style.display = 'flex';
+
+  // 스텝 결정
+  var isInstalled = window.matchMedia('(display-mode: standalone)').matches
+                 || window.navigator.standalone === true;
+
+  if(!isInstalled){
+    // 스텝1: 홈화면 추가
+    document.getElementById('ob-step1').style.display = 'block';
+    document.getElementById('ob-step2').style.display = 'none';
+
+    var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    var installBtn = document.getElementById('ob-install-btn');
+    var iosGuide   = document.getElementById('ob-ios-guide');
+
+    if(isIOS){
+      if(iosGuide)  iosGuide.style.display  = 'block';
+      if(installBtn) installBtn.style.display = 'none';
+    } else if(!_deferredPrompt){
+      if(installBtn) installBtn.textContent = '다음 →';
+    }
+  } else {
+    // 설치됐으면 바로 스텝2: 알림
+    document.getElementById('ob-step1').style.display = 'none';
+    document.getElementById('ob-step2').style.display = 'block';
+  }
+}
+
+function hideObPopup(){
+  var el = document.getElementById('ob-overlay');
+  if(el) el.style.display = 'none';
+}
+
+function obInstall(){
+  if(_deferredPrompt){
+    _deferredPrompt.prompt();
+    _deferredPrompt.userChoice.then(function(result){
+      _deferredPrompt = null;
+      // 설치 후 알림 스텝으로
+      document.getElementById('ob-step1').style.display = 'none';
+      document.getElementById('ob-step2').style.display = 'block';
+    });
+  } else {
+    // iOS거나 프롬프트 없으면 바로 알림 스텝
+    document.getElementById('ob-step1').style.display = 'none';
+    document.getElementById('ob-step2').style.display = 'block';
+  }
+}
+
+function obSkipInstall(){
+  // 나중에 — 팝업 닫되 다음 접속 시 다시 표시
+  hideObPopup();
+}
+
+function obAllow(){
+  if('Notification' in window){
+    Notification.requestPermission().then(function(perm){
+      hideObPopup();
+    });
+  } else {
+    hideObPopup();
+  }
+}
+
+function obDenyNotif(){
+  // 나중에 — 팝업 닫되 다음 접속 시 다시 표시
+  hideObPopup();
+}
+
+
 // ── Firebase 쿠폰 연동 ──
 async function loadUserCoupons(uid){
   if(!window._db) return;
@@ -2395,6 +2489,8 @@ document.addEventListener("DOMContentLoaded",()=>{
   // 쿠폰 사용 상태 localStorage 동기화
   syncCouponUsedState();
   renderCouponScreen();
+  // 온보딩 체크
+  setTimeout(checkOnboarding, 1000);
   // 초기 대표세일 노출 여부 체크
   checkMainsaleVisibility();
   // 초기 홈 배너 렌더링
@@ -5221,5 +5317,58 @@ function clearProdSearch(){
 
 </script>
 </div>
+
+<!-- ══ 온보딩 팝업 ══ -->
+<div id="ob-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:99999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;">
+  <div style="background:#fff;border-radius:24px;width:100%;max-width:360px;padding:28px 24px;position:relative;margin:auto;">
+
+    <!-- 스텝 1: 홈화면 추가 -->
+    <div id="ob-step1">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:52px;margin-bottom:10px;">📲</div>
+        <div style="font-size:20px;font-weight:900;color:#191F28;margin-bottom:8px;">홈화면에 추가하기</div>
+        <div style="font-size:13px;color:#666;line-height:1.7;">남한강마트 앱을 홈화면에 추가하면<br>앱처럼 빠르게 이용할 수 있어요</div>
+      </div>
+      <!-- iOS 안내 -->
+      <div id="ob-ios-guide" style="display:none;background:#EEF6FF;border-radius:14px;padding:14px 16px;margin-bottom:16px;font-size:12px;line-height:2.2;color:#333;">
+        1️⃣ 하단 <b style="color:#185FA5;">공유(□↑)</b> 버튼 탭<br>
+        2️⃣ <b style="color:#185FA5;">홈 화면에 추가</b> 선택<br>
+        3️⃣ 우측 상단 <b style="color:#185FA5;">추가</b> 탭
+      </div>
+      <button id="ob-install-btn" onclick="obInstall()"
+        style="width:100%;background:#191F28;color:#FFD600;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:'Noto Sans KR',sans-serif;">
+        홈화면에 추가하기
+      </button>
+      <button onclick="obSkipInstall()"
+        style="width:100%;background:#f5f5f5;color:#888;border:none;border-radius:14px;padding:13px;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+        나중에
+      </button>
+    </div>
+
+    <!-- 스텝 2: 알림 허용 -->
+    <div id="ob-step2" style="display:none;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:52px;margin-bottom:10px;">🔔</div>
+        <div style="font-size:20px;font-weight:900;color:#191F28;margin-bottom:8px;">특가 알림 받기</div>
+        <div style="font-size:13px;color:#666;line-height:1.7;">타임세일·이벤트 소식을<br>바로 알려드려요</div>
+      </div>
+      <div style="background:#FFF8E8;border-radius:14px;padding:14px 16px;margin-bottom:16px;font-size:12px;color:#555;line-height:2.2;">
+        ⚡ 타임세일 · 특가 안내<br>
+        📢 매장 공지 · 운영시간 변경<br>
+        🎟️ 쿠폰 · 이벤트 안내
+      </div>
+      <button onclick="obAllow()"
+        style="width:100%;background:#FFD600;color:#191F28;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:'Noto Sans KR',sans-serif;">
+        알림 허용하기
+      </button>
+      <button onclick="obDenyNotif()"
+        style="width:100%;background:#f5f5f5;color:#888;border:none;border-radius:14px;padding:13px;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+        나중에
+      </button>
+    </div>
+
+  </div>
+</div>
+
 </body>
 </html>
