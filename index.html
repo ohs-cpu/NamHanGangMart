@@ -420,6 +420,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
       if(typeof loadNoticesFromFirestore === 'function') loadNoticesFromFirestore();
       if(typeof loadCouponsFromFirestore === 'function') loadCouponsFromFirestore(user.uid);
       if(typeof loadAllStoreData === 'function') loadAllStoreData();
+      if(typeof loadHomeOrderFromFirestore === 'function') loadHomeOrderFromFirestore();
     }
   });
 
@@ -1945,6 +1946,46 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
 </div>
 
 <script>
+// ── 홈화면 순서/숨김 동기화 ──
+async function saveHomeOrderToFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'homeOrder');
+    await window._fbSetDoc(ref, { items: homeOrder, updatedAt: new Date().toISOString() });
+    console.log('홈순서 저장');
+  } catch(e){ console.warn('홈순서 저장 실패:', e); }
+}
+function loadHomeOrderFromFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'homeOrder');
+    window._fbOnSnapshot(ref, snap => {
+      if(snap.exists()){
+        const d = snap.data();
+        if(d.items && Array.isArray(d.items)){
+          homeOrder.length = 0;
+          d.items.forEach(x => homeOrder.push(x));
+          if(typeof applyHomeOrderSilent === 'function') applyHomeOrderSilent();
+        }
+      }
+    });
+  } catch(e){ console.warn('홈순서 로드 실패:', e); }
+}
+// 토스트/모달 없이 순서만 적용 (손님용)
+function applyHomeOrderSilent(){
+  const secEls = getHomeSecEls();
+  const cardWrap = document.querySelector('[data-sec="flyer"]')?.parentElement;
+  if(!cardWrap) return;
+  homeOrder.forEach(item => {
+    const el = secEls[item.id];
+    if(el){
+      cardWrap.appendChild(el);
+      el.style.display = item.hidden ? 'none' : '';
+    }
+  });
+}
+
+
 // ── 매장 공유 데이터 (타임세일/대표세일/추천/배너) ──
 async function saveStoreData(key, data){
   if(!window._db) return;
@@ -4081,6 +4122,7 @@ function toggleHomeSection(idx){
     const el = secEls[item.id];
     if(el) el.style.display = item.hidden ? 'none' : '';
   });
+  saveHomeOrderToFirestore();
 }
 
 function getHomeSecEls(){
@@ -4098,7 +4140,7 @@ function getHomeSecEls(){
 function applyHomeOrder(){
   const secEls = getHomeSecEls();
   const cardWrap = document.querySelector('[data-sec="flyer"]')?.parentElement;
-  if(!cardWrap){ closeModal('modal-home-order'); showToast('✅ 홈화면 순서가 변경됐어요!'); return; }
+  if(!cardWrap){ saveHomeOrderToFirestore(); closeModal('modal-home-order'); showToast('✅ 홈화면 순서가 변경됐어요!'); return; }
   homeOrder.forEach(item => {
     const el = secEls[item.id];
     if(el){
@@ -4106,6 +4148,7 @@ function applyHomeOrder(){
       el.style.display = item.hidden ? 'none' : '';
     }
   });
+  saveHomeOrderToFirestore();
   closeModal('modal-home-order');
   showToast('✅ 홈화면 순서가 변경됐어요!');
 }
