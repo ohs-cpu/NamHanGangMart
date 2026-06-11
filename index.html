@@ -396,6 +396,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
       if(typeof loadUserMemo === 'function') loadUserMemo(user.uid);
       // FCM 토큰 등록
       if(typeof registerFCMToken === 'function') registerFCMToken(user.uid);
+      // 공유 데이터 로드 (상품/공지/쿠폰)
+      if(typeof loadProductsFromFirestore === 'function') loadProductsFromFirestore();
+      if(typeof loadNoticesFromFirestore === 'function') loadNoticesFromFirestore();
+      if(typeof loadCouponsFromFirestore === 'function') loadCouponsFromFirestore(user.uid);
     }
   });
 
@@ -1910,16 +1914,130 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <div class="sf-label" style="margin:0;">편의시설</div>
           <button onclick="addFacilityRow()" style="background:var(--black);color:var(--white);border:none;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">+ 추가</button>
-        </div>
-        <div id="se-facilities" style="display:flex;flex-direction:column;gap:6px;"></div>
-      </div>
-      <button class="sf-submit" onclick="saveStoreInfo()">저장하기</button>
-      <button class="sf-cancel" onclick="closeModal('modal-store-edit')">취소</button>
-    </div>
-  </div>
-</div>
+        <<script>
+// ── Firestore 쿠폰 공유 데이터 ──
+async function saveCouponsToFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'coupons');
+    // used 상태 제외하고 저장 (관리자 발급 목록)
+    const template = COUPONS_DATA.map(c => ({
+      emoji: c.emoji, title: c.title, disc: c.disc,
+      unit: c.unit, cond: c.cond, exp: c.exp,
+      barcode: c.barcode, onetime: c.onetime||false
+    }));
+    await window._fbSetDoc(ref, { items: template, updatedAt: new Date().toISOString() });
+  } catch(e){ console.warn('쿠폰 저장 실패:', e); }
+}
 
-<script>
+async function loadCouponsFromFirestore(uid){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'coupons');
+    window._fbOnSnapshot(ref, async snap => {
+      if(snap.exists()){
+        const data = snap.data();
+        if(data.items && Array.isArray(data.items)){
+          // 손님 사용 이력 불러오기
+          let usedMap = {};
+          if(uid){
+            try {
+              const uRef = window._fbDoc(window._db, 'users', uid, 'data', 'couponUsed');
+              const uSnap = await window._fbGetDoc(uRef);
+              if(uSnap.exists()) usedMap = uSnap.data().usedMap || {};
+            } catch(e){}
+          }
+          // 병합
+          COUPONS_DATA.length = 0;
+          data.items.forEach(c => {
+            COUPONS_DATA.push({
+              ...c,
+              used: usedMap[c.barcode] || false
+            });
+          });
+          if(typeof renderCouponScreen === 'function') renderCouponScreen();
+          updateCouponBadge();
+        }
+      }
+    });
+  } catch(e){ console.warn('쿠폰 로드 실패:', e); }
+}
+
+async function saveCouponUsed(barcode, used){
+  const uid = getUid();
+  if(!window._db || !uid) return;
+  try {
+    const ref = window._fbDoc(window._db, 'users', uid, 'data', 'couponUsed');
+    const snap = await window._fbGetDoc(ref);
+    const usedMap = snap.exists() ? (snap.data().usedMap || {}) : {};
+    usedMap[barcode] = used;
+    await window._fbSetDoc(ref, { usedMap });
+  } catch(e){ console.warn('쿠폰 사용 저장 실패:', e); }
+}
+
+
+// ── Firestore 상품 동기화 ──
+async function saveProductsToFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'products');
+    await window._fbSetDoc(ref, {
+      items: PRODUCTS,
+      updatedAt: new Date().toISOString()
+    });
+  } catch(e){ console.warn('상품 저장 실패:', e); }
+}
+
+async function loadProductsFromFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'products');
+    // 실시간 동기화
+    window._fbOnSnapshot(ref, snap => {
+      if(snap.exists()){
+        const data = snap.data();
+        if(data.items && Array.isArray(data.items)){
+          PRODUCTS.length = 0;
+          data.items.forEach(p => PRODUCTS.push(p));
+          renderProducts(currentCat||'전체');
+          updateHomeSections();
+        }
+      }
+    });
+  } catch(e){ console.warn('상품 로드 실패:', e); }
+}
+
+// ── Firestore 공지 동기화 ──
+async function saveNoticesToFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'notices');
+    await window._fbSetDoc(ref, {
+      items: NOTICES,
+      updatedAt: new Date().toISOString()
+    });
+  } catch(e){ console.warn('공지 저장 실패:', e); }
+}
+
+async function loadNoticesFromFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'notices');
+    window._fbOnSnapshot(ref, snap => {
+      if(snap.exists()){
+        const data = snap.data();
+        if(data.items && Array.isArray(data.items)){
+          NOTICES.length = 0;
+          data.items.forEach(n => NOTICES.push(n));
+          if(typeof renderNotices === 'function') renderNotices();
+          if(typeof renderHomeImgNotices === 'function') renderHomeImgNotices();
+        }
+      }
+    });
+  } catch(e){ console.warn('공지 로드 실패:', e); }
+}
+
+
 // ── FCM 푸시 알림 ──
 async function registerFCMToken(uid){
   try {
@@ -2089,7 +2207,7 @@ async function loadUserMemo(uid){
       const data = snap.data();
       if(data.items && Array.isArray(data.items)){
         memoItems = data.items;
-        if(typeof renderMemoItems === 'function') renderMemoItems();
+        if(typeof renderMemo === 'function') renderMemo();
       }
     }
   } catch(e){ console.warn('메모 로드 실패:', e); }
@@ -3358,6 +3476,7 @@ function deleteNotice(i){
   renderNotices();
   renderHomeImgNotices();
   showToast('🗑️ 공지가 삭제됐어요');
+  saveNoticesToFirestore();
 }
 
 let noticeImgData = null;
@@ -3399,9 +3518,11 @@ function submitNotice(){
     NOTICES[noticeEditIdx] = noticeData;
     noticeEditIdx = null;
     showToast('✅ 공지가 수정됐어요!');
+  saveNoticesToFirestore();
   } else {
     NOTICES.unshift(noticeData);
     showToast('✅ 공지가 등록됐어요!');
+  saveNoticesToFirestore();
   }
 
   document.getElementById('n-title').value = '';
@@ -3524,7 +3645,8 @@ function renderCpList(){
 
 function toggleCpUsed(idx){
   COUPONS_DATA[idx].used = !COUPONS_DATA[idx].used;
-  const uid2 = getUid(); if(uid2) saveUserCoupons(uid2);
+  const _c = COUPONS_DATA[idx];
+  saveCouponUsed(_c.barcode, _c.used);
   renderCpList();
   renderCouponScreen();
   showToast('✅ 쿠폰 상태가 변경됐어요!');
@@ -3558,6 +3680,7 @@ function submitCoupon(){
   renderCouponScreen();
   switchCpTab('list');
   showToast('✅ 쿠폰이 등록됐어요!');
+  saveCouponsToFirestore();
 }
 
 function renderCouponScreen(){
@@ -4229,6 +4352,7 @@ function applyExcelProducts(){
     excelParsed.forEach(p => PRODUCTS.push(p));
     renderProducts(currentCat);
     showToast('✅ '+PRODUCTS.length+'개 상품이 반영됐어요!');
+  saveProductsToFirestore();;
   } else {
     // 스케줄 등록
     const sc = {
@@ -5366,6 +5490,16 @@ function prodSearch(val){
 }
 function clearProdSearch(){
   const inp=document.getElementById('prod-search-input');
+  const clear=document.getElementById('prod-search-clear');
+  if(inp) inp.value=''; if(clear) clear.style.display='none';
+  renderProducts(currentCat);
+}
+
+</script>) inp.value=''; if(clear) clear.style.display='none';
+  renderProducts(currentCat);
+}
+
+</script>tElementById('prod-search-input');
   const clear=document.getElementById('prod-search-clear');
   if(inp) inp.value=''; if(clear) clear.style.display='none';
   renderProducts(currentCat);
