@@ -392,7 +392,6 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
     if(user){
       window._uid = user.uid;
       // 쿠폰/메모 로드
-      if(typeof loadUserCoupons === 'function') loadUserCoupons(user.uid);
       if(typeof loadUserMemo === 'function') loadUserMemo(user.uid);
       // FCM 토큰 등록
       if(typeof registerFCMToken === 'function') registerFCMToken(user.uid);
@@ -400,6 +399,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
       if(typeof loadProductsFromFirestore === 'function') loadProductsFromFirestore();
       if(typeof loadNoticesFromFirestore === 'function') loadNoticesFromFirestore();
       if(typeof loadCouponsFromFirestore === 'function') loadCouponsFromFirestore(user.uid);
+      if(typeof loadAllStoreData === 'function') loadAllStoreData();
     }
   });
 
@@ -1913,8 +1913,70 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <div class="sf-label" style="margin:0;">편의시설</div>
-          <button onclick="addFacilityRow()" style="background:var(--black);color:var(--white);border:none;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">+ 추가</button>
-        <<script>
+          <button onclick="addFacilityRow()" style="background:var(--black);color:var(--white);border:none;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:po<script>
+// ── Firestore 매장 공유 데이터 (타임세일/대표세일/추천/배너/전단지) ──
+
+async function saveStoreData(key, data){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', key);
+    await window._fbSetDoc(ref, { data: data, updatedAt: new Date().toISOString() });
+  } catch(e){ console.warn(key+' 저장 실패:', e); }
+}
+
+function listenStoreData(key, callback){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', key);
+    window._fbOnSnapshot(ref, snap => {
+      if(snap.exists()) callback(snap.data().data);
+    });
+  } catch(e){ console.warn(key+' 구독 실패:', e); }
+}
+
+function loadAllStoreData(){
+  // 타임세일
+  listenStoreData('timesale', function(data){
+    if(!data) return;
+    tsItems = data.items || [];
+    if(window.tsSchedule) window.tsSchedule = data.schedule || null;
+    checkTimesaleVisibility();
+    if(typeof renderTimesaleAdmin === 'function') renderTimesaleAdmin();
+  });
+  // 대표세일
+  listenStoreData('mainsale', function(data){
+    if(!data) return;
+    msItems = data.items || [];
+    if(window.msSchedule) window.msSchedule = data.schedule || null;
+    checkMainsaleVisibility();
+  });
+  // 추천상품
+  listenStoreData('recommend', function(data){
+    if(!data) return;
+    recSelected = data.items || [];
+    if(typeof renderRecItems === 'function') renderRecItems();
+    const recSec = document.querySelector('[data-sec="recommend"]');
+    if(recSec) recSec.style.display = recSelected.length > 0 ? 'block' : 'none';
+  });
+  // 홈배너
+  listenStoreData('banners', function(data){
+    if(!Array.isArray(data)) return;
+    HOME_BANNERS = data;
+    renderHomeBanners();
+  });
+  // 전단지
+  listenStoreData('flyers', function(data){
+    if(!Array.isArray(data)) return;
+    flyerList = data;
+    if(flyerList.length > 0){
+      const last = flyerList[flyerList.length-1];
+      if(typeof applyFlyerToScreen === 'function')
+        applyFlyerToScreen(last.title, last.start, last.end, last.images||[]);
+    }
+  });
+}
+
+
 // ── Firestore 쿠폰 공유 데이터 ──
 async function saveCouponsToFirestore(){
   if(!window._db) return;
@@ -2170,34 +2232,6 @@ function obDenyNotif(){
 
 
 // ── Firebase 쿠폰 연동 ──
-async function loadUserCoupons(uid){
-  if(!window._db) return;
-  try {
-    const ref = window._fbDoc(window._db, 'users', uid, 'data', 'coupons');
-    const snap = await window._fbGetDoc(ref);
-    if(snap.exists()){
-      const data = snap.data();
-      if(data.coupons && Array.isArray(data.coupons)){
-        COUPONS_DATA = data.coupons;
-        if(typeof renderCouponScreen === 'function') renderCouponScreen();
-        updateCouponBadge();
-      }
-    } else {
-      // 첫 방문 — 기본 쿠폰 저장
-      await saveUserCoupons(uid);
-    }
-  } catch(e){ console.warn('쿠폰 로드 실패:', e); }
-}
-
-async function saveUserCoupons(uid){
-  if(!window._db || !uid) return;
-  try {
-    const ref = window._fbDoc(window._db, 'users', uid, 'data', 'coupons');
-    await window._fbSetDoc(ref, { coupons: COUPONS_DATA, updatedAt: new Date().toISOString() });
-  } catch(e){ console.warn('쿠폰 저장 실패:', e); }
-}
-
-// ── Firebase 메모 연동 ──
 async function loadUserMemo(uid){
   if(!window._db) return;
   try {
@@ -2917,6 +2951,7 @@ function submitMainsale(){
     }).join('');
   }
   closeModal('modal-mainsale');
+  saveStoreData('mainsale', {items:msItems, schedule:window.msSchedule||null});
   checkMainsaleVisibility();
   showToast('✅ 대표세일이 업데이트됐어요!');
 }
@@ -5389,6 +5424,7 @@ function submitFlyer(){
 
   // 전단지탭 반영
   applyFlyerToScreen(title, start, end, flyerImages);
+  saveStoreData('flyers', flyerList);
 
   // 폼 초기화
   document.getElementById('f-title').value = '';
@@ -5492,6 +5528,10 @@ function clearProdSearch(){
   const inp=document.getElementById('prod-search-input');
   const clear=document.getElementById('prod-search-clear');
   if(inp) inp.value=''; if(clear) clear.style.display='none';
+  renderProducts(currentCat);
+}
+
+</script>lear.style.display='none';
   renderProducts(currentCat);
 }
 
