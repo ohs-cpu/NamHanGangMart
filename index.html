@@ -1939,30 +1939,28 @@ async function registerFCMToken(uid){
     if(!token) return;
     window._fcmToken = token;
     if(window._db){
+      // 개인 위치
       const ref = window._fbDoc(window._db, 'users', uid, 'data', 'fcmToken');
       await window._fbSetDoc(ref, { token: token, updatedAt: new Date().toISOString() });
+      // 공개 수집 위치 (관리자가 읽을 수 있도록) — uid를 문서 ID로
+      const pubRef = window._fbDoc(window._db, 'store', 'pushTokens');
+      const pubSnap = await window._fbGetDoc(pubRef);
+      const map = (pubSnap.exists() && pubSnap.data().tokens) ? pubSnap.data().tokens : {};
+      map[uid] = token;
+      await window._fbSetDoc(pubRef, { tokens: map, updatedAt: new Date().toISOString() });
     }
     console.log('FCM 토큰 등록 완료');
   } catch(e){ console.warn('FCM 토큰 오류:', e); }
 }
 
 async function collectAllTokens(){
-  if(!window._db || !window._fbGetDocs) return [];
+  if(!window._db) return [];
   try {
-    const usersCol = window._fbCollection(window._db, 'users');
-    const snap = await window._fbGetDocs(usersCol);
-    const tokens = [];
-    for(const userDoc of snap.docs){
-      try {
-        const tref = window._fbDoc(window._db, 'users', userDoc.id, 'data', 'fcmToken');
-        const tsnap = await window._fbGetDoc(tref);
-        if(tsnap.exists()){
-          const tk = tsnap.data().token;
-          if(tk) tokens.push(tk);
-        }
-      } catch(e){}
-    }
-    return tokens;
+    const pubRef = window._fbDoc(window._db, 'store', 'pushTokens');
+    const snap = await window._fbGetDoc(pubRef);
+    if(!snap.exists()) return [];
+    const map = snap.data().tokens || {};
+    return Object.values(map).filter(Boolean);
   } catch(e){ console.warn('토큰 수집 실패:', e); return []; }
 }
 
