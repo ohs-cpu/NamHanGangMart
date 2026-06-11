@@ -413,9 +413,13 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
     if(user){
       window._uid = user.uid;
       console.log('Firebase 로그인:', user.uid);
-      if(typeof loadUserCoupons === 'function') loadUserCoupons(user.uid);
       if(typeof loadUserMemo === 'function') loadUserMemo(user.uid);
       if(typeof registerFCMToken === 'function') registerFCMToken(user.uid);
+      // 공유 데이터 실시간 로드
+      if(typeof loadProductsFromFirestore === 'function') loadProductsFromFirestore();
+      if(typeof loadNoticesFromFirestore === 'function') loadNoticesFromFirestore();
+      if(typeof loadCouponsFromFirestore === 'function') loadCouponsFromFirestore(user.uid);
+      if(typeof loadAllStoreData === 'function') loadAllStoreData();
     }
   });
 
@@ -1941,6 +1945,147 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
 </div>
 
 <script>
+// ── 매장 공유 데이터 (타임세일/대표세일/추천/배너) ──
+async function saveStoreData(key, data){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', key);
+    await window._fbSetDoc(ref, { data: data, updatedAt: new Date().toISOString() });
+  } catch(e){ console.warn(key+' 저장 실패:', e); }
+}
+function listenStoreData(key, cb){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', key);
+    window._fbOnSnapshot(ref, snap => { if(snap.exists()) cb(snap.data().data); });
+  } catch(e){ console.warn(key+' 구독 실패:', e); }
+}
+function loadAllStoreData(){
+  listenStoreData('timesale', d => {
+    if(!Array.isArray(d)) return;
+    tsItems.length = 0; d.forEach(x => tsItems.push(x));
+    if(typeof checkTimesaleVisibility === 'function') checkTimesaleVisibility();
+    if(typeof renderTimesale === 'function') renderTimesale();
+  });
+  listenStoreData('mainsale', d => {
+    if(!Array.isArray(d)) return;
+    msItems.length = 0; d.forEach(x => msItems.push(x));
+    if(typeof checkMainsaleVisibility === 'function') checkMainsaleVisibility();
+    if(typeof renderMainsale === 'function') renderMainsale();
+  });
+  listenStoreData('recommend', d => {
+    if(!Array.isArray(d)) return;
+    recSelected.length = 0; d.forEach(x => recSelected.push(x));
+    if(typeof renderRecommend === 'function') renderRecommend();
+    if(typeof renderHome === 'function') renderHome();
+  });
+  listenStoreData('banners', d => {
+    if(!Array.isArray(d)) return;
+    HOME_BANNERS.length = 0; d.forEach(x => HOME_BANNERS.push(x));
+    if(typeof renderHomeBanners === 'function') renderHomeBanners();
+  });
+}
+
+// ── 쿠폰 공유 (관리자 발급 → 모든 손님) ──
+async function saveCouponsToFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'coupons');
+    const tpl = COUPONS_DATA.map(c => ({
+      emoji:c.emoji, title:c.title, disc:c.disc, unit:c.unit,
+      cond:c.cond, exp:c.exp, barcode:c.barcode, onetime:c.onetime||false
+    }));
+    await window._fbSetDoc(ref, { items: tpl, updatedAt: new Date().toISOString() });
+  } catch(e){ console.warn('쿠폰 저장 실패:', e); }
+}
+function loadCouponsFromFirestore(uid){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'coupons');
+    window._fbOnSnapshot(ref, async snap => {
+      if(!snap.exists()) return;
+      const d = snap.data();
+      if(!d.items || !Array.isArray(d.items)) return;
+      let usedMap = {};
+      if(uid){
+        try {
+          const uRef = window._fbDoc(window._db, 'users', uid, 'data', 'couponUsed');
+          const uSnap = await window._fbGetDoc(uRef);
+          if(uSnap.exists()) usedMap = uSnap.data().usedMap || {};
+        } catch(e){}
+      }
+      COUPONS_DATA.length = 0;
+      d.items.forEach(c => COUPONS_DATA.push({ ...c, used: usedMap[c.barcode]||false }));
+      if(typeof renderCouponScreen === 'function') renderCouponScreen();
+      if(typeof updateCouponBadge === 'function') updateCouponBadge();
+    });
+  } catch(e){ console.warn('쿠폰 로드 실패:', e); }
+}
+async function saveCouponUsed(barcode, used){
+  if(!window._db || !window._uid) return;
+  try {
+    const ref = window._fbDoc(window._db, 'users', window._uid, 'data', 'couponUsed');
+    const snap = await window._fbGetDoc(ref);
+    const map = snap.exists() ? (snap.data().usedMap||{}) : {};
+    map[barcode] = used;
+    await window._fbSetDoc(ref, { usedMap: map });
+  } catch(e){ console.warn('쿠폰사용 저장 실패:', e); }
+}
+
+
+// ── Firestore 공유 데이터 동기화 ──
+async function saveProductsToFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'products');
+    await window._fbSetDoc(ref, { items: PRODUCTS, updatedAt: new Date().toISOString() });
+    console.log('상품 저장:', PRODUCTS.length);
+  } catch(e){ console.warn('상품 저장 실패:', e); }
+}
+function loadProductsFromFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'products');
+    window._fbOnSnapshot(ref, snap => {
+      if(snap.exists()){
+        const d = snap.data();
+        if(d.items && Array.isArray(d.items)){
+          PRODUCTS.length = 0;
+          d.items.forEach(p => PRODUCTS.push(p));
+          if(typeof renderProducts === 'function') renderProducts(typeof currentCat!=='undefined'?currentCat:'전체');
+          if(typeof renderTimesale === 'function') renderTimesale();
+        }
+      }
+    });
+  } catch(e){ console.warn('상품 로드 실패:', e); }
+}
+
+async function saveNoticesToFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'notices');
+    await window._fbSetDoc(ref, { items: NOTICES, updatedAt: new Date().toISOString() });
+  } catch(e){ console.warn('공지 저장 실패:', e); }
+}
+function loadNoticesFromFirestore(){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'store', 'notices');
+    window._fbOnSnapshot(ref, snap => {
+      if(snap.exists()){
+        const d = snap.data();
+        if(d.items && Array.isArray(d.items)){
+          NOTICES.length = 0;
+          d.items.forEach(n => NOTICES.push(n));
+          if(typeof renderNotices === 'function') renderNotices();
+          if(typeof renderHomeImgNotices === 'function') renderHomeImgNotices();
+        }
+      }
+    });
+  } catch(e){ console.warn('공지 로드 실패:', e); }
+}
+
+
 // ── FCM 푸시 (Cloudflare Worker) ──
 const PUSH_WORKER_URL = 'https://namhangangmart-push.ohs-cec.workers.dev';
 const PUSH_ADMIN_SECRET = 'namhan2026secret';
@@ -2494,6 +2639,7 @@ function staffConfirmCoupon(){
   // localStorage에 사용됨 저장
   localStorage.setItem('coupon_used_'+coupon.barcode, '1');
   coupon.used = true;
+  if(typeof saveCouponUsed==='function') saveCouponUsed(coupon.barcode, true);
   // UI 업데이트
   document.getElementById('bm-used-overlay').style.display = 'block';
   document.getElementById('bm-staff-btn').style.display = 'none';
@@ -2857,6 +3003,7 @@ function submitMainsale(){
     }).join('');
   }
   closeModal('modal-mainsale');
+  saveStoreData('mainsale', msItems);
   checkMainsaleVisibility();
   showToast('✅ 대표세일이 업데이트됐어요!');
 }
@@ -3155,6 +3302,7 @@ function submitTimesale(){
     }).join('');
   }
   closeModal('modal-timesale');
+  saveStoreData(isTime?'timesale':'mainsale', isTime?tsItems:msItems);
   showToast('✅ ' + (isTime ? '타임세일' : '대표세일') + '이 업데이트됐어요!');
 }
 
@@ -3280,6 +3428,7 @@ function submitHomeBanner(){
 
   renderHomeBanners();
   switchHbTab('list');
+  saveStoreData('banners', HOME_BANNERS);
   showToast('✅ 배너가 등록됐어요!');
 }
 
@@ -3582,7 +3731,7 @@ function renderCpList(){
 
 function toggleCpUsed(idx){
   COUPONS_DATA[idx].used = !COUPONS_DATA[idx].used;
-  const uid2 = getUid(); if(uid2) saveUserCoupons(uid2);
+  const _c = COUPONS_DATA[idx]; if(typeof saveCouponUsed==='function') saveCouponUsed(_c.barcode, _c.used);
   renderCpList();
   renderCouponScreen();
   showToast('✅ 쿠폰 상태가 변경됐어요!');
@@ -3763,7 +3912,8 @@ ${productNames}
       showToast('✅ AI 멘트로 추천상품이 업데이트됐어요!');
     }
   } catch(e) {
-    showToast('✅ 추천상품이 업데이트됐어요!');
+    saveStoreData('recommend', recSelected);
+  showToast('✅ 추천상품이 업데이트됐어요!');
   }
 }
 
@@ -4731,6 +4881,7 @@ function saveProductEdit(){
     const finalList = recSelected.map(n=>PRODUCTS.find(p=>p.name===n)).filter(Boolean);
     if(finalList.length) renderRecList(finalList, recHooks.slice(0, finalList.length));
   }
+  saveProductsToFirestore();
   showToast('✅ 상품이 수정됐어요!');
 }
 
@@ -4740,6 +4891,7 @@ function deleteProduct(idx){
   // confirm removed
   PRODUCTS.splice(idx, 1);
   renderPrList();
+  saveProductsToFirestore();
   showToast('🗑️ 상품이 삭제됐어요!');
 }
 
@@ -5404,6 +5556,7 @@ function submitProduct(){
   document.getElementById('pr-sale').value='';
   document.getElementById('pr-options').innerHTML='';
   document.getElementById('pr-disc-preview').textContent='할인율 자동 계산';
+  saveProductsToFirestore();
   showToast('✅ 상품이 등록됐어요!');
 }
 // ── 상품탭 검색 ──
