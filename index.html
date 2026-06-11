@@ -356,6 +356,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
   import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCI51nLc-8tCdVAs8yalrxeKFYusVwCo5c",
@@ -366,13 +367,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
     appId: "1:222555359715:web:dba12309d3035b976938d6"
   };
 
-  const app  = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db   = getFirestore(app);
+  const app      = initializeApp(firebaseConfig);
+  const auth     = getAuth(app);
+  const db       = getFirestore(app);
+  const messaging = getMessaging(app);
 
   // 전역 노출
   window._db   = db;
   window._auth = auth;
+  window._messaging = messaging;
   window._fbDoc = doc;
   window._fbGetDoc = getDoc;
   window._fbSetDoc = setDoc;
@@ -380,19 +383,29 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
   window._fbCollection = collection;
   window._fbQuery = query;
   window._fbOrderBy = orderBy;
+  window._VAPID_KEY = "BDmzBkIgpoj8G7n-Nd6c2NtSMkldVyb_Zt2rfC-hpj--QptwcKdmgifon7fMrfhg9NudaU5Tlchv41zRCyGS-Vc";
 
   // ── 익명 로그인 ──
   signInAnonymously(auth).catch(e => console.warn('Auth error:', e));
 
-  onAuthStateChanged(auth, user => {
+  onAuthStateChanged(auth, async user => {
     if(user){
       window._uid = user.uid;
-      console.log('Firebase 로그인:', user.uid);
-      // 쿠폰 로드
+      // 쿠폰/메모 로드
       if(typeof loadUserCoupons === 'function') loadUserCoupons(user.uid);
-      // 메모 로드
       if(typeof loadUserMemo === 'function') loadUserMemo(user.uid);
+      // FCM 토큰 등록
+      if(typeof registerFCMToken === 'function') registerFCMToken(user.uid);
     }
+  });
+
+  // ── 포그라운드 푸시 수신 ──
+  onMessage(messaging, payload => {
+    const t = payload.notification?.title || '남한강마트';
+    const b = payload.notification?.body  || '';
+    const img = payload.notification?.image || null;
+    if(typeof addNoti === 'function') addNoti(t, b, img);
+    if(typeof showToast === 'function') showToast('🔔 ' + t);
   });
 </script>
 </head>
@@ -1907,6 +1920,43 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
 </div>
 
 <script>
+// ── FCM 푸시 알림 ──
+async function registerFCMToken(uid){
+  try {
+    if(!window._messaging || !window._VAPID_KEY) return;
+    if(Notification.permission !== 'granted') return;
+    const token = await getTokenFCM();
+    if(!token) return;
+    window._fcmToken = token;
+    // Firestore에 토큰 저장
+    if(window._db){
+      const ref = window._fbDoc(window._db, 'users', uid, 'data', 'fcmToken');
+      await window._fbSetDoc(ref, { token: token, updatedAt: new Date().toISOString() });
+    }
+    console.log('FCM 토큰 등록 완료');
+  } catch(e){ console.warn('FCM 토큰 오류:', e); }
+}
+
+async function getTokenFCM(){
+  try {
+    const { getToken } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js");
+    return await getToken(window._messaging, { vapidKey: window._VAPID_KEY });
+  } catch(e){ return null; }
+}
+
+// 알림 허용 시 FCM 토큰 등록
+async function obAllow(){
+  if('Notification' in window){
+    const perm = await Notification.requestPermission();
+    if(perm === 'granted'){
+      const uid = getUid();
+      if(uid) registerFCMToken(uid);
+    }
+  }
+  hideObPopup();
+}
+
+
 // ── 온보딩 팝업 ──
 var _deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', function(e){
@@ -1993,15 +2043,7 @@ function obSkipInstall(){
   }
 }
 
-function obAllow(){
-  if('Notification' in window){
-    Notification.requestPermission().then(function(perm){
-      hideObPopup();
-    });
-  } else {
-    hideObPopup();
-  }
-}
+
 
 function obDenyNotif(){
   // 나중에 — 팝업 닫되 다음 접속 시 다시 표시
