@@ -2017,8 +2017,14 @@ function loadAllStoreData(){
   listenStoreData('recommend', d => {
     if(!Array.isArray(d)) return;
     recSelected.length = 0; d.forEach(x => recSelected.push(x));
-    if(typeof renderRecommend === 'function') renderRecommend();
-    if(typeof renderHome === 'function') renderHome();
+    // 추천상품 홈 영역 렌더링
+    const finalList = recSelected.map(n => PRODUCTS.find(p => p.name === n)).filter(Boolean);
+    if(typeof renderRecList === 'function' && finalList.length){
+      renderRecList(finalList, (typeof recHooks!=='undefined') ? recHooks.slice(0, finalList.length) : []);
+    }
+    // 추천 섹션 표시/숨김
+    const recSec = document.querySelector('[data-sec="recommend"]');
+    if(recSec) recSec.style.display = recSelected.length > 0 ? '' : 'none';
   });
   listenStoreData('banners', d => {
     if(!Array.isArray(d)) return;
@@ -2095,6 +2101,13 @@ function loadProductsFromFirestore(){
           d.items.forEach(p => PRODUCTS.push(p));
           if(typeof renderProducts === 'function') renderProducts(typeof currentCat!=='undefined'?currentCat:'전체');
           if(typeof renderTimesale === 'function') renderTimesale();
+          // 상품 로드 후 추천상품도 다시 렌더 (상품 정보 필요)
+          if(typeof recSelected !== 'undefined' && recSelected.length){
+            const fl = recSelected.map(n => PRODUCTS.find(p => p.name === n)).filter(Boolean);
+            if(typeof renderRecList === 'function' && fl.length){
+              renderRecList(fl, (typeof recHooks!=='undefined') ? recHooks.slice(0, fl.length) : []);
+            }
+          }
         }
       }
     });
