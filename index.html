@@ -2006,13 +2006,11 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
 <script>
 // ── 손님 화면 설정 (테마) ──
 function openSettings(){
-  // 현재 설정 버튼 상태 표시
   const fs = localStorage.getItem('theme_fontsize') || 'normal';
   const dark = localStorage.getItem('theme_dark') === '1';
   highlightFontBtn(fs);
   highlightDarkBtn(dark);
-  const m = document.getElementById('modal-settings');
-  if(m) m.classList.add('show');
+  openModal('modal-settings');
 }
 
 function setFontSize(size){
@@ -2100,11 +2098,22 @@ function applyHomeOrderSilent(){
 
 // ── 매장 공유 데이터 (타임세일/대표세일/추천/배너) ──
 async function saveStoreData(key, data){
-  if(!window._db) return;
+  if(!window._db){ if(typeof showToast==='function') showToast('⚠️ 서버 연결 안됨'); return; }
   try {
+    // 용량 체크 (Firestore 문서 1MB 제한)
+    const size = JSON.stringify(data).length;
+    if(size > 900000){
+      if(typeof showToast==='function') showToast('⚠️ 이미지 용량이 너무 커요! 작은 이미지를 써주세요');
+      console.warn(key+' 용량 초과:', Math.round(size/1024)+'KB');
+      return;
+    }
     const ref = window._fbDoc(window._db, 'store', key);
     await window._fbSetDoc(ref, { data: data, updatedAt: new Date().toISOString() });
-  } catch(e){ console.warn(key+' 저장 실패:', e); }
+    console.log(key+' 저장 완료:', Math.round(size/1024)+'KB');
+  } catch(e){
+    console.warn(key+' 저장 실패:', e);
+    if(typeof showToast==='function') showToast('⚠️ 저장 실패: '+e.message);
+  }
 }
 function listenStoreData(key, cb){
   if(!window._db) return;
@@ -3556,11 +3565,29 @@ function renderHbList(){
 function previewHbImg(input){
   const file=input.files[0];
   if(!file) return;
-  const reader=new FileReader();
-  reader.onload=e=>{
+  compressImageFile(file, 1000, 0.75, function(dataUrl){
     const prev=document.getElementById('hb-img-preview');
-    prev.innerHTML='<img src="'+e.target.result+'" style="width:100%;height:100%;object-fit:cover;"/>';
-    prev._imgData=e.target.result;
+    prev.innerHTML='<img src="'+dataUrl+'" style="width:100%;height:100%;object-fit:cover;"/>';
+    prev._imgData=dataUrl;
+  });
+}
+
+// 이미지 압축 (캔버스 리사이즈 + JPEG 변환)
+function compressImageFile(file, maxW, quality, cb){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const img=new Image();
+    img.onload=function(){
+      let w=img.width, h=img.height;
+      if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+      const canvas=document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      const ctx=canvas.getContext('2d');
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img,0,0,w,h);
+      cb(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src=e.target.result;
   };
   reader.readAsDataURL(file);
 }
@@ -3615,10 +3642,10 @@ function editHbBanner(idx){
 }
 
 function deleteHbBanner(idx){
-  // confirm removed
   HOME_BANNERS.splice(idx,1);
   renderHbList();
   renderHomeBanners();
+  saveStoreData('banners', HOME_BANNERS);
   showToast('🗑️ 배너가 삭제됐어요!');
 }
 
