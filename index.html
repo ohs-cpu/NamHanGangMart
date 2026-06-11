@@ -355,7 +355,8 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, setDoc, getDocs, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCI51nLc-8tCdVAs8yalrxeKFYusVwCo5c",
@@ -369,17 +370,27 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
   const app  = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db   = getFirestore(app);
+  let messaging = null;
+  try { messaging = getMessaging(app); } catch(e){ console.warn('messaging init:', e); }
 
   // 전역 노출
   window._db   = db;
   window._auth = auth;
+  window._messaging = messaging;
   window._fbDoc = doc;
   window._fbGetDoc = getDoc;
   window._fbSetDoc = setDoc;
+  window._fbGetDocs = getDocs;
   window._fbOnSnapshot = onSnapshot;
   window._fbCollection = collection;
   window._fbQuery = query;
   window._fbOrderBy = orderBy;
+  window._VAPID_KEY = "BDmzBkIgpoj8G7n-Nd6c2NtSMkldVyb_Zt2rfC-hpj--QptwcKdmgifon7fMrfhg9NudaU5Tlchv41zRCyGS-Vc";
+  window._getTokenFCM = async function(){
+    if(!messaging) return null;
+    try { return await getToken(messaging, { vapidKey: window._VAPID_KEY }); }
+    catch(e){ console.warn('getToken:', e); return null; }
+  };
 
   // ── 익명 로그인 ──
   signInAnonymously(auth).catch(e => console.warn('Auth error:', e));
@@ -388,12 +399,21 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
     if(user){
       window._uid = user.uid;
       console.log('Firebase 로그인:', user.uid);
-      // 쿠폰 로드
       if(typeof loadUserCoupons === 'function') loadUserCoupons(user.uid);
-      // 메모 로드
       if(typeof loadUserMemo === 'function') loadUserMemo(user.uid);
+      if(typeof registerFCMToken === 'function') registerFCMToken(user.uid);
     }
   });
+
+  // ── 포그라운드 푸시 수신 ──
+  if(messaging){
+    onMessage(messaging, payload => {
+      const t = payload.notification?.title || '남한강마트';
+      const b = payload.notification?.body  || '';
+      if(typeof addNoti === 'function') addNoti(t, b, null);
+      if(typeof showToast === 'function') showToast('🔔 ' + t);
+    });
+  }
 </script>
 </head>
 <body>
@@ -1907,6 +1927,68 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
 </div>
 
 <script>
+// ── FCM 푸시 (Cloudflare Worker) ──
+const PUSH_WORKER_URL = 'https://namhangangmart-push.ohs-cec.workers.dev';
+const PUSH_ADMIN_SECRET = 'namhan2026secret';
+
+async function registerFCMToken(uid){
+  try {
+    if(!window._messaging) return;
+    if(Notification.permission !== 'granted') return;
+    const token = await window._getTokenFCM();
+    if(!token) return;
+    window._fcmToken = token;
+    if(window._db){
+      const ref = window._fbDoc(window._db, 'users', uid, 'data', 'fcmToken');
+      await window._fbSetDoc(ref, { token: token, updatedAt: new Date().toISOString() });
+    }
+    console.log('FCM 토큰 등록 완료');
+  } catch(e){ console.warn('FCM 토큰 오류:', e); }
+}
+
+async function collectAllTokens(){
+  if(!window._db || !window._fbGetDocs) return [];
+  try {
+    const usersCol = window._fbCollection(window._db, 'users');
+    const snap = await window._fbGetDocs(usersCol);
+    const tokens = [];
+    for(const userDoc of snap.docs){
+      try {
+        const tref = window._fbDoc(window._db, 'users', userDoc.id, 'data', 'fcmToken');
+        const tsnap = await window._fbGetDoc(tref);
+        if(tsnap.exists()){
+          const tk = tsnap.data().token;
+          if(tk) tokens.push(tk);
+        }
+      } catch(e){}
+    }
+    return tokens;
+  } catch(e){ console.warn('토큰 수집 실패:', e); return []; }
+}
+
+async function sendPushViaWorker(title, body, image){
+  const tokens = await collectAllTokens();
+  if(!tokens.length){
+    showToast('⚠️ 발송 대상이 없어요 (알림 허용한 손님 0명)');
+    return { success:0, failure:0 };
+  }
+  try {
+    const res = await fetch(PUSH_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', 'X-Admin-Secret':PUSH_ADMIN_SECRET },
+      body: JSON.stringify({ tokens, title, body, image: image||null })
+    });
+    const data = await res.json();
+    if(res.ok) return data;
+    showToast('⚠️ 발송 실패: '+(data.error||res.status));
+    return { success:0, failure:tokens.length };
+  } catch(e){
+    showToast('⚠️ 발송 오류: '+e.message);
+    return { success:0, failure:tokens.length };
+  }
+}
+
+
 // ── 온보딩 팝업 ──
 var _deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', function(e){
@@ -1988,6 +2070,9 @@ function obSkipInstall(){
 function obAllow(){
   if('Notification' in window){
     Notification.requestPermission().then(function(perm){
+      if(perm === 'granted' && window._uid){
+        registerFCMToken(window._uid);
+      }
       hideObPopup();
     });
   } else {
@@ -5154,7 +5239,11 @@ function submitPush(){
     showToast('📅 '+date+' '+time+' 예약 발송 등록됐어요!');
   } else {
     addNoti(t, b, pushImgData);
-    showToast('✅ 382명에게 푸시 알림 발송! (FCM 연동 후 실제 발송)');
+    showToast('📤 발송 중...');
+    sendPushViaWorker(t, b, pushImgData).then(function(r){
+      if(r.success > 0) showToast('✅ '+r.success+'명에게 푸시 발송 완료!');
+      else if(r.failure > 0) showToast('⚠️ 발송 실패 ('+r.failure+'건)');
+    });
     closeModal('modal-push');
   }
 
