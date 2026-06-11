@@ -1309,7 +1309,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
           <div id="pr-emoji-display" style="font-size:36px;text-align:center;padding:8px;background:var(--gray6);border-radius:10px;cursor:pointer;margin:6px 0 8px;" onclick="toggleEmojiPicker('pr-emoji-picker')">🛍️</div>
           <input type="hidden" id="pr-emoji" value="🛍️"/>
           <div id="pr-emoji-picker" style="display:none;background:#fff;border:1px solid var(--gray5);border-radius:12px;padding:10px;margin-bottom:8px;">
-            <input type="text" placeholder="🔍 이모지 검색... (예: 고기, 과일)" oninput="renderEmojiGrid('pr-emoji-picker','pr-emoji',this.value)"
+            <input type="text" placeholder="🔍 이모지 검색... (예: 고기, 과일)" oninput="renderEmojiGrid('pr-emoji-picker','pr',this.value)"
               style="width:100%;border:1px solid var(--gray5);border-radius:8px;padding:7px 10px;font-size:12px;outline:none;box-sizing:border-box;margin-bottom:8px;font-family:'Noto Sans KR',sans-serif;"/>
             <div id="pr-emoji-picker-grid" style="display:flex;flex-wrap:wrap;gap:4px;max-height:160px;overflow-y:auto;"></div>
           </div>
@@ -1444,7 +1444,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
           <div id="pr-edit-emoji-display" style="font-size:36px;text-align:center;padding:8px;background:var(--gray6);border-radius:10px;cursor:pointer;margin-bottom:8px;" onclick="toggleEmojiPicker('pr-edit-emoji-picker')">🛍️</div>
           <input type="hidden" id="pr-edit-emoji" value="🛍️"/>
           <div id="pr-edit-emoji-picker" style="display:none;background:#fff;border:1px solid var(--gray5);border-radius:12px;padding:10px;margin-bottom:8px;">
-            <input type="text" placeholder="🔍 이모지 검색... (예: 고기, 과일)" oninput="renderEmojiGrid('pr-edit-emoji-picker','pr-edit-emoji',this.value)"
+            <input type="text" placeholder="🔍 이모지 검색... (예: 고기, 과일)" oninput="renderEmojiGrid('pr-edit-emoji-picker','pr-edit',this.value)"
               style="width:100%;border:1px solid var(--gray5);border-radius:8px;padding:7px 10px;font-size:12px;outline:none;box-sizing:border-box;margin-bottom:8px;font-family:'Noto Sans KR',sans-serif;"/>
             <div id="pr-edit-emoji-picker-grid" style="display:flex;flex-wrap:wrap;gap:4px;max-height:160px;overflow-y:auto;"></div>
           </div>
@@ -4683,16 +4683,15 @@ function filterEmoji(pickerId, prefix){
 function toggleEmojiPicker(id){
   const el = document.getElementById(id);
   if(!el) return;
-  const prefix = id.replace('-emoji-picker','');
+  // pickEmoji가 쓰는 prefix와 일치시킴 (pr-edit-emoji-picker → pr-edit)
+  const prefix = id.replace('-emoji-picker','').replace(/-emoji$/,'');
   if(el.style.display === 'none' || el.style.display === ''){
     el.style.display = 'block';
-    // push 전용 피커
     if(id === 'push-title-emoji-picker'){
       renderEmojiGridForInput(id, 'push-title', '');
     } else if(id === 'push-body-emoji-picker'){
       renderEmojiGridForInput(id, 'push-body', '');
     } else {
-      // 상품 이모지 피커 — 검색창 초기화 + 그리드 렌더링
       const input = el.querySelector('input');
       if(input) input.value = '';
       renderEmojiGrid(id, prefix, '');
