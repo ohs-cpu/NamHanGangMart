@@ -1933,27 +1933,29 @@ function showObPopup(){
   if(!el) return;
   el.style.display = 'flex';
 
-  // 스텝 결정
   var isInstalled = window.matchMedia('(display-mode: standalone)').matches
                  || window.navigator.standalone === true;
 
   if(!isInstalled){
-    // 스텝1: 홈화면 추가
     document.getElementById('ob-step1').style.display = 'block';
     document.getElementById('ob-step2').style.display = 'none';
 
     var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    var installBtn = document.getElementById('ob-install-btn');
-    var iosGuide   = document.getElementById('ob-ios-guide');
+    var androidWrap = document.getElementById('ob-android-wrap');
+    var iosWrap     = document.getElementById('ob-ios-wrap');
 
     if(isIOS){
-      if(iosGuide)  iosGuide.style.display  = 'block';
-      if(installBtn) installBtn.style.display = 'none';
-    } else if(!_deferredPrompt){
-      if(installBtn) installBtn.textContent = '다음 →';
+      if(androidWrap) androidWrap.style.display = 'none';
+      if(iosWrap)     iosWrap.style.display     = 'block';
+    } else {
+      if(androidWrap) androidWrap.style.display = 'block';
+      if(iosWrap)     iosWrap.style.display     = 'none';
+      if(!_deferredPrompt){
+        var btn = document.getElementById('ob-install-btn');
+        if(btn) btn.textContent = '다음 →';
+      }
     }
   } else {
-    // 설치됐으면 바로 스텝2: 알림
     document.getElementById('ob-step1').style.display = 'none';
     document.getElementById('ob-step2').style.display = 'block';
   }
@@ -1981,8 +1983,14 @@ function obInstall(){
 }
 
 function obSkipInstall(){
-  // 나중에 — 팝업 닫되 다음 접속 시 다시 표시
-  hideObPopup();
+  var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if(isIOS){
+    // iOS는 추가했어요 → 알림 스텝으로
+    document.getElementById('ob-step1').style.display = 'none';
+    document.getElementById('ob-step2').style.display = 'block';
+  } else {
+    hideObPopup();
+  }
 }
 
 function obAllow(){
@@ -2491,6 +2499,12 @@ document.addEventListener("DOMContentLoaded",()=>{
   renderCouponScreen();
   // 온보딩 체크
   setTimeout(checkOnboarding, 1000);
+
+  // Service Worker 등록
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('./sw.js').catch(function(){});
+  }
+
   // 초기 대표세일 노출 여부 체크
   checkMainsaleVisibility();
   // 초기 홈 배너 렌더링
@@ -5324,21 +5338,45 @@ function clearProdSearch(){
 
     <!-- 스텝 1: 홈화면 추가 -->
     <div id="ob-step1">
-      <div style="text-align:center;margin-bottom:20px;">
+      <div style="text-align:center;margin-bottom:16px;">
         <div style="font-size:52px;margin-bottom:10px;">📲</div>
         <div style="font-size:20px;font-weight:900;color:#191F28;margin-bottom:8px;">홈화면에 추가하기</div>
         <div style="font-size:13px;color:#666;line-height:1.7;">남한강마트 앱을 홈화면에 추가하면<br>앱처럼 빠르게 이용할 수 있어요</div>
       </div>
-      <!-- iOS 안내 -->
-      <div id="ob-ios-guide" style="display:none;background:#EEF6FF;border-radius:14px;padding:14px 16px;margin-bottom:16px;font-size:12px;line-height:2.2;color:#333;">
-        1️⃣ 하단 <b style="color:#185FA5;">공유(□↑)</b> 버튼 탭<br>
-        2️⃣ <b style="color:#185FA5;">홈 화면에 추가</b> 선택<br>
-        3️⃣ 우측 상단 <b style="color:#185FA5;">추가</b> 탭
+
+      <!-- Android: 설치 버튼 -->
+      <div id="ob-android-wrap">
+        <button id="ob-install-btn" onclick="obInstall()"
+          style="width:100%;background:#191F28;color:#FFD600;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:'Noto Sans KR',sans-serif;">
+          홈화면에 추가하기
+        </button>
       </div>
-      <button id="ob-install-btn" onclick="obInstall()"
-        style="width:100%;background:#191F28;color:#FFD600;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:'Noto Sans KR',sans-serif;">
-        홈화면에 추가하기
-      </button>
+
+      <!-- iOS: 단계별 안내 -->
+      <div id="ob-ios-wrap" style="display:none;">
+        <div style="background:#EEF6FF;border-radius:14px;padding:16px;margin-bottom:16px;">
+          <div style="font-size:12px;font-weight:700;color:#185FA5;margin-bottom:10px;">📱 홈화면 추가 방법</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:10px 12px;">
+              <div style="width:28px;height:28px;background:#185FA5;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;">1</div>
+              <div style="font-size:12px;color:#333;">하단 <b style="color:#185FA5;">공유 버튼 (□↑)</b> 탭</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:10px 12px;">
+              <div style="width:28px;height:28px;background:#185FA5;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;">2</div>
+              <div style="font-size:12px;color:#333;"><b style="color:#185FA5;">홈 화면에 추가</b> 선택</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:10px 12px;">
+              <div style="width:28px;height:28px;background:#185FA5;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;flex-shrink:0;">3</div>
+              <div style="font-size:12px;color:#333;">우측 상단 <b style="color:#185FA5;">추가</b> 탭</div>
+            </div>
+          </div>
+        </div>
+        <button onclick="obSkipInstall()"
+          style="width:100%;background:#191F28;color:#FFD600;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:'Noto Sans KR',sans-serif;">
+          추가했어요! →
+        </button>
+      </div>
+
       <button onclick="obSkipInstall()"
         style="width:100%;background:#f5f5f5;color:#888;border:none;border-radius:14px;padding:13px;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
         나중에
