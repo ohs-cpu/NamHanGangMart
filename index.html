@@ -36,6 +36,31 @@
   --green: #1B874B;
   --r4: 4px; --r8: 8px; --r12: 12px; --r16: 16px; --r20: 20px; --r24: 24px;
 }
+
+/* ── 손님 테마: 다크모드 ── */
+body.dark-mode {
+  --bg: #1A1D21;
+  --white: #25292E;
+  --black: #F2F4F6;
+  --gray1: #E8ECF0;
+  --gray2: #D1D6DB;
+  --gray3: #8B95A1;
+  --gray4: #6B7480;
+  --gray5: #3A3F46;
+  --gray6: #2C3036;
+  --yellow-lt: #3A3520;
+}
+
+/* ── 손님 테마: 글씨 크기 (전체 비례 확대) ── */
+.wrap { transform-origin: top center; }
+body.font-large  .wrap { zoom: 1.12; }
+body.font-xlarge .wrap { zoom: 1.25; }
+/* zoom 미지원 브라우저 대비 */
+@supports not (zoom: 1) {
+  body.font-large  { font-size: 112%; }
+  body.font-xlarge { font-size: 125%; }
+}
+
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh;}
 .wrap{width:100%;max-width:430px;min-height:100vh;background:var(--bg);display:flex;flex-direction:column;overflow-x:hidden;margin:0 auto;}
@@ -492,6 +517,10 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
         <div class="hdr-logo-name">남한강마트 퇴계원점</div>
       </div>
     </div>
+    <!-- 설정 버튼 -->
+    <button onclick="openSettings()" aria-label="설정" style="background:none;border:none;cursor:pointer;padding:6px;flex-shrink:0;">
+      <span style="font-size:24px;line-height:1;">⚙️</span>
+    </button>
     <!-- 알림 버튼 -->
     <button onclick="openNotiBox()" style="position:relative;background:none;border:none;cursor:pointer;padding:6px;flex-shrink:0;">
       <span style="font-size:24px;line-height:1;">🔔</span>
@@ -1207,6 +1236,35 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
   <button class="tab" id="nav-memo" onclick="switchTo('memo')"><span class="ti">🗒️</span><span>메모</span><div class="tab-ink"></div></button>
   <button class="tab" id="nav-store" onclick="switchTo('store')"><span class="ti">📍</span><span>매장</span><div class="tab-ink"></div></button>
 </nav>
+
+<!-- 설정 모달 (손님 테마) -->
+<div class="modal-bg" id="modal-settings">
+  <div class="modal-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">⚙️ 화면 설정</div>
+
+    <div style="margin:20px 0 10px;font-size:16px;font-weight:700;color:var(--black);">글씨 크기</div>
+    <div style="display:flex;gap:8px;">
+      <button class="set-font-btn" data-size="normal" onclick="setFontSize('normal')"
+        style="flex:1;padding:16px 0;border:2px solid var(--gray5);border-radius:12px;background:var(--white);font-size:15px;cursor:pointer;color:var(--black);">보통</button>
+      <button class="set-font-btn" data-size="large" onclick="setFontSize('large')"
+        style="flex:1;padding:16px 0;border:2px solid var(--gray5);border-radius:12px;background:var(--white);font-size:18px;cursor:pointer;color:var(--black);">크게</button>
+      <button class="set-font-btn" data-size="xlarge" onclick="setFontSize('xlarge')"
+        style="flex:1;padding:16px 0;border:2px solid var(--gray5);border-radius:12px;background:var(--white);font-size:21px;cursor:pointer;color:var(--black);">아주크게</button>
+    </div>
+
+    <div style="margin:24px 0 10px;font-size:16px;font-weight:700;color:var(--black);">화면 모드</div>
+    <div style="display:flex;gap:8px;">
+      <button class="set-dark-btn" data-mode="light" onclick="setDarkMode(false)"
+        style="flex:1;padding:16px 0;border:2px solid var(--gray5);border-radius:12px;background:var(--white);font-size:15px;cursor:pointer;color:var(--black);">☀️ 밝게</button>
+      <button class="set-dark-btn" data-mode="dark" onclick="setDarkMode(true)"
+        style="flex:1;padding:16px 0;border:2px solid var(--gray5);border-radius:12px;background:var(--white);font-size:15px;cursor:pointer;color:var(--black);">🌙 어둡게</button>
+    </div>
+
+    <button onclick="closeModal('modal-settings')"
+      style="width:100%;margin-top:24px;padding:16px 0;background:var(--yellow);border:none;border-radius:12px;font-size:17px;font-weight:700;cursor:pointer;color:var(--black);">완료</button>
+  </div>
+</div>
 
 <!-- 관리자 PIN 모달 -->
 <div class="modal-bg" id="modal-admin-pin">
@@ -1946,6 +2004,60 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
 </div>
 
 <script>
+// ── 손님 화면 설정 (테마) ──
+function openSettings(){
+  // 현재 설정 버튼 상태 표시
+  const fs = localStorage.getItem('theme_fontsize') || 'normal';
+  const dark = localStorage.getItem('theme_dark') === '1';
+  highlightFontBtn(fs);
+  highlightDarkBtn(dark);
+  const m = document.getElementById('modal-settings');
+  if(m) m.classList.add('show');
+}
+
+function setFontSize(size){
+  document.body.classList.remove('font-large','font-xlarge');
+  if(size === 'large') document.body.classList.add('font-large');
+  else if(size === 'xlarge') document.body.classList.add('font-xlarge');
+  localStorage.setItem('theme_fontsize', size);
+  highlightFontBtn(size);
+}
+
+function setDarkMode(on){
+  if(on) document.body.classList.add('dark-mode');
+  else document.body.classList.remove('dark-mode');
+  localStorage.setItem('theme_dark', on ? '1' : '0');
+  highlightDarkBtn(on);
+}
+
+function highlightFontBtn(size){
+  document.querySelectorAll('.set-font-btn').forEach(b => {
+    const on = b.dataset.size === size;
+    b.style.borderColor = on ? 'var(--yellow)' : 'var(--gray5)';
+    b.style.background = on ? 'var(--yellow-lt)' : 'var(--white)';
+    b.style.fontWeight = on ? '700' : '400';
+  });
+}
+function highlightDarkBtn(on){
+  document.querySelectorAll('.set-dark-btn').forEach(b => {
+    const sel = (b.dataset.mode === 'dark') === on;
+    b.style.borderColor = sel ? 'var(--yellow)' : 'var(--gray5)';
+    b.style.background = sel ? 'var(--yellow-lt)' : 'var(--white)';
+    b.style.fontWeight = sel ? '700' : '400';
+  });
+}
+
+// 저장된 테마 적용 (앱 시작 시)
+function applyStoredTheme(){
+  const fs = localStorage.getItem('theme_fontsize') || 'normal';
+  const dark = localStorage.getItem('theme_dark') === '1';
+  document.body.classList.remove('font-large','font-xlarge','dark-mode');
+  if(fs === 'large') document.body.classList.add('font-large');
+  else if(fs === 'xlarge') document.body.classList.add('font-xlarge');
+  if(dark) document.body.classList.add('dark-mode');
+}
+
+
 // ── 홈화면 순서/숨김 동기화 ──
 async function saveHomeOrderToFirestore(){
   if(!window._db) return;
@@ -2800,6 +2912,8 @@ function resetHomeAuto(){
 // 터치 스와이프
 let tX=0,htX=0;
 document.addEventListener("DOMContentLoaded",()=>{
+  // 저장된 화면 설정 적용
+  if(typeof applyStoredTheme === 'function') applyStoredTheme();
   // 쿠폰 사용 상태 localStorage 동기화
   syncCouponUsedState();
   renderCouponScreen();
