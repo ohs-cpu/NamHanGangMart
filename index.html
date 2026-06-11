@@ -350,6 +350,51 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
 .pp-title{font-size:13px;font-weight:700;color:var(--black);margin-bottom:2px;}
 .pp-body{font-size:12px;color:var(--gray2);white-space:pre-wrap;}
 </style>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCI51nLc-8tCdVAs8yalrxeKFYusVwCo5c",
+    authDomain: "namhangangmart.firebaseapp.com",
+    projectId: "namhangangmart",
+    storageBucket: "namhangangmart.firebasestorage.app",
+    messagingSenderId: "222555359715",
+    appId: "1:222555359715:web:dba12309d3035b976938d6"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  // 전역 노출
+  window._db   = db;
+  window._auth = auth;
+  window._fbDoc = doc;
+  window._fbGetDoc = getDoc;
+  window._fbSetDoc = setDoc;
+  window._fbOnSnapshot = onSnapshot;
+  window._fbCollection = collection;
+  window._fbQuery = query;
+  window._fbOrderBy = orderBy;
+
+  // ── 익명 로그인 ──
+  signInAnonymously(auth).catch(e => console.warn('Auth error:', e));
+
+  onAuthStateChanged(auth, user => {
+    if(user){
+      window._uid = user.uid;
+      console.log('Firebase 로그인:', user.uid);
+      // 쿠폰 로드
+      if(typeof loadUserCoupons === 'function') loadUserCoupons(user.uid);
+      // 메모 로드
+      if(typeof loadUserMemo === 'function') loadUserMemo(user.uid);
+    }
+  });
+</script>
 </head>
 <body>
 <div class="wrap">
@@ -1862,6 +1907,61 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
 </div>
 
 <script>
+// ── Firebase 쿠폰 연동 ──
+async function loadUserCoupons(uid){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'users', uid, 'data', 'coupons');
+    const snap = await window._fbGetDoc(ref);
+    if(snap.exists()){
+      const data = snap.data();
+      if(data.coupons && Array.isArray(data.coupons)){
+        COUPONS_DATA = data.coupons;
+        if(typeof renderCouponScreen === 'function') renderCouponScreen();
+        updateCouponBadge();
+      }
+    } else {
+      // 첫 방문 — 기본 쿠폰 저장
+      await saveUserCoupons(uid);
+    }
+  } catch(e){ console.warn('쿠폰 로드 실패:', e); }
+}
+
+async function saveUserCoupons(uid){
+  if(!window._db || !uid) return;
+  try {
+    const ref = window._fbDoc(window._db, 'users', uid, 'data', 'coupons');
+    await window._fbSetDoc(ref, { coupons: COUPONS_DATA, updatedAt: new Date().toISOString() });
+  } catch(e){ console.warn('쿠폰 저장 실패:', e); }
+}
+
+// ── Firebase 메모 연동 ──
+async function loadUserMemo(uid){
+  if(!window._db) return;
+  try {
+    const ref = window._fbDoc(window._db, 'users', uid, 'data', 'memo');
+    const snap = await window._fbGetDoc(ref);
+    if(snap.exists()){
+      const data = snap.data();
+      if(data.items && Array.isArray(data.items)){
+        memoItems = data.items;
+        if(typeof renderMemoItems === 'function') renderMemoItems();
+      }
+    }
+  } catch(e){ console.warn('메모 로드 실패:', e); }
+}
+
+async function saveUserMemo(uid){
+  if(!window._db || !uid) return;
+  try {
+    const ref = window._fbDoc(window._db, 'users', uid, 'data', 'memo');
+    await window._fbSetDoc(ref, { items: memoItems, updatedAt: new Date().toISOString() });
+  } catch(e){ console.warn('메모 저장 실패:', e); }
+}
+
+function getUid(){ return window._uid || null; }
+
+
 // 모달을 항상 body 최상단에서 열기
 function openModal(id){
   var el = document.getElementById(id);
@@ -2390,6 +2490,8 @@ function toggleMemo(id){const m=memoItems.find(x=>x.id===id);if(m){m.done=!m.don
 
 function saveMemoToStorage(){
   try { localStorage.setItem('memo_items', JSON.stringify(memoItems)); } catch(e){}
+  const uid = getUid();
+  if(uid) saveUserMemo(uid);
 }
 function deleteMemo(id){memoItems=memoItems.filter(x=>x.id!==id);saveMemoToStorage();renderMemo();}
 
@@ -3270,6 +3372,7 @@ function renderCpList(){
 
 function toggleCpUsed(idx){
   COUPONS_DATA[idx].used = !COUPONS_DATA[idx].used;
+  const uid2 = getUid(); if(uid2) saveUserCoupons(uid2);
   renderCpList();
   renderCouponScreen();
   showToast('✅ 쿠폰 상태가 변경됐어요!');
