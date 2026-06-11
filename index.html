@@ -1914,6 +1914,62 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);min-height:100vh
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
           <div class="sf-label" style="margin:0;">편의시설</div>
           <button onclick="addFacilityRow()" style="background:var(--black);color:var(--white);border:none;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:po<script>
+// ── FCM 실제 발송 (Cloudflare Worker) ──
+const PUSH_WORKER_URL = 'https://namhangangmart-push.ohs-cec.workers.dev';
+const PUSH_ADMIN_SECRET = 'namhan2026secret';
+
+// Firestore에서 모든 손님 FCM 토큰 수집
+async function collectAllTokens(){
+  if(!window._db) return [];
+  try {
+    const usersCol = window._fbCollection(window._db, 'users');
+    const { getDocs } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+    const snap = await getDocs(usersCol);
+    const tokens = [];
+    for(const userDoc of snap.docs){
+      try {
+        const tokenRef = window._fbDoc(window._db, 'users', userDoc.id, 'data', 'fcmToken');
+        const tokenSnap = await window._fbGetDoc(tokenRef);
+        if(tokenSnap.exists()){
+          const tk = tokenSnap.data().token;
+          if(tk) tokens.push(tk);
+        }
+      } catch(e){}
+    }
+    return tokens;
+  } catch(e){ console.warn('토큰 수집 실패:', e); return []; }
+}
+
+// Worker로 발송 요청
+async function sendPushViaWorker(title, body, image){
+  const tokens = await collectAllTokens();
+  if(!tokens.length){
+    showToast('⚠️ 발송 대상이 없어요 (토큰 0개)');
+    return { success:0, failure:0 };
+  }
+  try {
+    const res = await fetch(PUSH_WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Secret': PUSH_ADMIN_SECRET
+      },
+      body: JSON.stringify({ tokens, title, body, image: image||null })
+    });
+    const data = await res.json();
+    if(res.ok){
+      return data;
+    } else {
+      showToast('⚠️ 발송 실패: '+(data.error||res.status));
+      return { success:0, failure:tokens.length };
+    }
+  } catch(e){
+    showToast('⚠️ 발송 오류: '+e.message);
+    return { success:0, failure:tokens.length };
+  }
+}
+
+
 // ── Firestore 매장 공유 데이터 (타임세일/대표세일/추천/배너/전단지) ──
 
 async function saveStoreData(key, data){
@@ -5346,7 +5402,9 @@ function checkPushSchedules(){
     if(!s.sent && (s.date < today || (s.date===today && s.time<=curTime))){
       s.sent = true;
       addNoti(s.title, s.body, s.img||null);
-      showToast('📬 예약 발송됨: '+s.title);
+      sendPushViaWorker(s.title, s.body, s.img||null).then(function(result){
+        if(result.success > 0) showToast('📬 예약 발송 완료: '+s.title);
+      });
     }
   });
 }
@@ -5368,8 +5426,16 @@ function submitPush(){
     renderPushScheduleList();
     showToast('📅 '+date+' '+time+' 예약 발송 등록됐어요!');
   } else {
+    // 실제 FCM 발송
     addNoti(t, b, pushImgData);
-    showToast('✅ 382명에게 푸시 알림 발송! (FCM 연동 후 실제 발송)');
+    showToast('📤 발송 중...');
+    sendPushViaWorker(t, b, pushImgData).then(function(result){
+      if(result.success > 0){
+        showToast('✅ '+result.success+'명에게 푸시 발송 완료!');
+      } else if(result.failure > 0){
+        showToast('⚠️ 발송 실패 ('+result.failure+'건)');
+      }
+    });
     closeModal('modal-push');
   }
 
